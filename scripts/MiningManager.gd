@@ -11,7 +11,7 @@ signal mining_occurred(resources_gained)
 func _ready():
 	print("Mining Manager initialized.")
 
-func assign_miner_to_planet(system_index: int, planet_index: int):
+func assign_miner_to_planet(system_index: int, planet_index: int) -> Dictionary:
 	# We need to know if we have miners available
 	var printer_manager = get_parent().get_node("PrinterManager")
 	var miner_count = printer_manager.inventory.get("miner_v1", 0)
@@ -23,10 +23,9 @@ func assign_miner_to_planet(system_index: int, planet_index: int):
 			deployments[key] = 0
 		deployments[key] += 1
 		print("Assigned miner to planet ", key)
-		return true
+		return {"success": true, "message": "MINER DEPLOYED TO PLANET " + str(planet_index)}
 	
-	print("No miners in cargo to assign!")
-	return false
+	return {"success": false, "message": "NO MINERS IN CARGO TO ASSIGN!"}
 
 func process_turn(systems: Array):
 	var total_gained = {"iron": 0, "titanium": 0, "uranium": 0}

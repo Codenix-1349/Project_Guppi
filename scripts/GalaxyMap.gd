@@ -25,8 +25,17 @@ func generate_map(num_systems: int):
 				"raw_ore": randi_range(50, 200),
 				"rare_metals": randi_range(0, 20)
 			},
-			"scanned": false
+			"scanned": false,
+			"enemies": []
 		}
+		
+		# Spawn enemies (30% chance for systems beyond index 1)
+		if i > 1 and randf() < 0.3:
+			var enemy_type = Global.enemies_data[randi() % Global.enemies_data.size()]
+			var count = randi_range(1, 3)
+			for c in range(count):
+				system.enemies.append(enemy_type.duplicate(true))
+		
 		systems.append(system)
 	
 	for i in range(systems.size()):

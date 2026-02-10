@@ -14,9 +14,13 @@ extends Node
 @onready var titanium_label = $UI/Control/ResourceBar/TitaniumLabel
 @onready var uranium_label = $UI/Control/ResourceBar/UraniumLabel
 @onready var data_label = $UI/Control/ResourceBar/DataLabel
+@onready var hp_label = $UI/Control/ResourceBar/HPLabel
+@onready var level_label = $UI/Control/TurnInfo/LevelLabel
 @onready var turn_label = $UI/Control/TurnInfo/TurnLabel
 @onready var phase_label = $UI/Control/TurnInfo/PhaseLabel
 @onready var end_turn_button = $UI/Control/TurnInfo/EndTurnButton
+
+@onready var game_over_layer = $GameOverLayer
 
 @onready var jump_button = $UI/Control/ActionButtons/JumpButton
 @onready var scan_button = $UI/Control/ActionButtons/ScanButton
@@ -50,7 +54,11 @@ func _ready():
 	deploy_miner_btn.pressed.connect(_on_deploy_miner_pressed)
 	
 	printer_manager.printer_updated.connect(_on_printer_updated)
+	printer_manager.drone_fabricated.connect(_on_drone_fabricated)
+	mining_manager.mining_occurred.connect(_on_mining_occurred)
+	mothership.energy_depleted.connect(_on_energy_depleted)
 	combat_manager.combat_occurred.connect(_on_combat_occurred)
+	Global.xp_gained.connect(_on_xp_gained)
 	
 	print_scout_btn.pressed.connect(_on_print_scout)
 	print_miner_btn.pressed.connect(_on_print_miner)
@@ -92,7 +100,9 @@ func _on_deploy_miner_pressed():
 	var p_idx = galaxy_map.selected_planet_index if "selected_planet_index" in galaxy_map else -1
 	if p_idx == -1: p_idx = 0 # Default to first planet if none selected
 	
-	if mining_manager.assign_miner_to_planet(current_idx, p_idx):
+	var result = mining_manager.assign_miner_to_planet(current_idx, p_idx)
+	_show_temporary_message(result.message)
+	if result.success:
 		update_ui()
 
 func _update_detailed_info():
@@ -156,6 +166,16 @@ func _update_detailed_info():
 		var summary = "[b]GESAMT RESSOURCEN:[/b]\n"
 		summary += "FE: " + str(total_res.iron) + " | TI: " + str(total_res.titanium) + " | U: " + str(total_res.uranium) + "\n"
 		summary += "TOTAL MINER: [color=green]" + str(total_miners) + "[/color]\n\n"
+		
+		if system.enemies.size() > 0:
+			summary += "[b][color=red]BEDROHUNGEN ERKANNT:[/color][/b]\n"
+			var enemy_counts = {}
+			for e in system.enemies:
+				enemy_counts[e.name] = enemy_counts.get(e.name, 0) + 1
+			for e_name in enemy_counts:
+				summary += "- " + e_name + " (x" + str(enemy_counts[e_name]) + ")\n"
+			summary += "\n"
+			
 		summary += "[b]PLANETEN:[/b]\n" + planet_list
 		
 		system_content.text = summary
@@ -183,29 +203,77 @@ func _on_print_defender(): _on_print_requested("defender_v1")
 func _on_print_requested(drone_id: String):
 	var drone = Global.get_drone_by_id(drone_id)
 	if drone:
-		printer_manager.add_job(drone)
-		update_ui()
+		var result = printer_manager.add_job(drone)
+		_show_temporary_message(result.message)
+		if result.success:
+			update_ui()
 
 func _on_printer_updated():
 	update_ui()
 
 func _on_combat_occurred(report):
-	print("Combat Report: ", report.status)
-	combat_log.text = "COMBAT: " + report.status
+	var status_text = "GEFECHT: "
+	match report.status:
+		"VICTORY": status_text += "SIEG!"
+		"SKIRMISH_LOSS": status_text += "RÜCKZUG / VERLUSTE"
+		"CRITICAL_DAMAGE": status_text += "KRITISCHER TREFFER (HÜLLE!)"
+		_: status_text += report.status
+		
+	combat_log.text = status_text
+	if report.xp_gained > 0:
+		combat_log.text += "\nXP erhalten: +" + str(report.xp_gained)
+		
+	if report.mothership_damage > 0:
+		combat_log.text += "\nSCHIFFSSCHADEN: " + str(report.mothership_damage)
+		
 	if report.player_losses.size() > 0:
-		combat_log.text += "\nLosses: " + str(report.player_losses)
+		var loss_parts = []
+		for drone_id in report.player_losses:
+			var drone = Global.get_drone_by_id(drone_id)
+			var drone_name = drone.name if drone else drone_id
+			loss_parts.append(str(report.player_losses[drone_id]) + "x " + drone_name)
+		combat_log.text += "\nVerluste: " + ", ".join(loss_parts)
+	
 	combat_log.visible = true
 	# Auto-hide after 5 seconds
 	await get_tree().create_timer(5.0).timeout
 	combat_log.visible = false
 	update_ui()
 
+func _on_xp_gained(amount):
+	print("XP Gained: ", amount)
+	update_ui()
+
+func _on_drone_fabricated(drone_id):
+	var drone = Global.get_drone_by_id(drone_id)
+	_show_temporary_message("FABRICATION COMPLETE: " + drone.name.to_upper())
+	update_ui()
+
+func _on_mining_occurred(gained):
+	var msg = "MINING COMPLETE: "
+	var parts = []
+	for res in gained:
+		if gained[res] > 0:
+			parts.append(str(gained[res]) + " " + res.capitalize())
+	if parts.size() > 0:
+		_show_temporary_message(msg + ", ".join(parts))
+	update_ui()
+
+func _on_restart_pressed():
+	Global.reset_game()
+	get_tree().reload_current_scene()
+
+func _on_energy_depleted():
+	_show_temporary_message("WARNING: CRITICAL ENERGY DEPLETED!")
+
 func _on_jump_pressed():
 	var target_index = galaxy_map.selected_system_index
 	if target_index == -1: return
 	
 	if galaxy_map.is_system_connected(mothership.get_current_system(), target_index):
-		if mothership.jump_to_system(target_index):
+		var result = mothership.jump_to_system(target_index)
+		_show_temporary_message(result.message)
+		if result.success:
 			if galaxy_map is Node2D:
 				galaxy_map.queue_redraw()
 			else:
@@ -222,7 +290,9 @@ func _on_jump_pressed():
 func _on_scan_pressed():
 	var current_index = mothership.get_current_system()
 	var system = galaxy_map.systems[current_index]
-	if scan_manager.scan_system(system):
+	var result = scan_manager.scan_system(system)
+	_show_temporary_message(result.message)
+	if result.success:
 		if galaxy_map is Node2D:
 			galaxy_map.queue_redraw()
 		else:
@@ -249,21 +319,26 @@ func update_scout_button():
 	var has_scout = printer_manager.inventory.get("scout_v1", 0) > 0
 	
 	launch_scout_btn.disabled = !in_range or !has_scout or turn_manager.current_phase != turn_manager.Phase.PLANNING
+	
+	# Set helpful tooltip
+	if !has_scout: launch_scout_btn.tooltip_text = "Keine Scouts im Inventar"
+	elif !in_range: launch_scout_btn.tooltip_text = "Ziel außer Reichweite (> 800)"
+	elif turn_manager.current_phase != turn_manager.Phase.PLANNING: launch_scout_btn.tooltip_text = "Nur in der Planungsphase möglich"
+	else: launch_scout_btn.tooltip_text = "Scout starten"
 
 func _on_launch_scout_pressed():
 	var s_idx = galaxy_map.selected_system_index
 	if s_idx < 0: return
 	
 	var system = galaxy_map.systems[s_idx]
-	if scout_manager.launch_scout(system, scan_manager):
+	var result = scout_manager.launch_scout(system, scan_manager)
+	_show_temporary_message(result.message)
+	if result.success:
 		if galaxy_map is Node2D:
 			galaxy_map.queue_redraw()
 		else:
 			galaxy_map.update_selection_visuals()
-		_show_temporary_message("SCOUT SUCCESS: DATA RECOVERED")
 		update_ui()
-	else:
-		_show_temporary_message("SCOUT ERROR: NO DRONES OR ENERGY")
 
 func _show_temporary_message(msg: String):
 	combat_log.text = msg
@@ -313,7 +388,9 @@ func update_ui():
 	titanium_label.text = "Titanium: " + str(Global.resources.titanium)
 	uranium_label.text = "Uranium: " + str(Global.resources.uranium)
 	data_label.text = "Data: " + str(Global.resources.data)
+	hp_label.text = "HP: " + str(Global.mothership_hp) + "/" + str(Global.max_mothership_hp)
 	turn_label.text = "Turn: " + str(turn_manager.turn_number)
+	level_label.text = "LVL: " + str(Global.mothership_level) + " (XP: " + str(Global.xp) + "/" + str(Global.xp_to_next_level) + ")"
 	phase_label.text = "Phase: " + turn_manager.Phase.keys()[turn_manager.current_phase].capitalize()
 	
 	# System / Planet Info Logic
@@ -329,8 +406,8 @@ func update_ui():
 		else:
 			printer_slots[i].visible = false
 			
-	if not galaxy_map is Node2D:
-		galaxy_map.update_selection_visuals()
+	if Global.mothership_hp <= 0:
+		game_over_layer.visible = true
 
 func _unhandled_input(event):
 	if has_node("GalaxyMap3D") and event is InputEventMouseButton and event.pressed and event.button_index == MOUSE_BUTTON_LEFT:

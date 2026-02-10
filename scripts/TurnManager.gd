@@ -61,7 +61,6 @@ func resolve_turn():
 		next_phase() # To EVENT
 
 func _check_for_skirmish():
-	# Simple random chance for enemy presence in unscanned systems
 	var managers = get_parent()
 	var ms = managers.get_node("Mothership")
 	var current_system_idx = ms.get_current_system()
@@ -69,10 +68,15 @@ func _check_for_skirmish():
 	var map = main.get_node("GalaxyMap") if main.has_node("GalaxyMap") else main.get_node("GalaxyMap3D")
 	var system = map.systems[current_system_idx]
 	
-	if not system.scanned and randf() < 0.3:
-		print("Enemy encounter!")
-		var enemy_units = [{"name": "Raider", "durability": 20, "firepower": 5}]
-		managers.get_node("CombatManager").resolve_skirmish(managers.get_node("PrinterManager").inventory, enemy_units)
+	if system.enemies.size() > 0:
+		print("Enemy encounter in system ", system.name, "!")
+		var report = managers.get_node("CombatManager").resolve_skirmish(managers.get_node("PrinterManager").inventory, system.enemies)
+		
+		if report.status == "VICTORY":
+			system.enemies.clear() # System cleared
+		elif report.status == "SKIRMISH_LOSS":
+			# Some enemies might have been destroyed? (Simplified: they stay for now)
+			pass
 
 func process_event():
 	if current_phase == Phase.EVENT:
