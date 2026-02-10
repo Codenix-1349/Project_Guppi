@@ -9,6 +9,7 @@
 [ext_resource type="Script" path="res://scripts/CombatManager.gd" id="7_cm"]
 [ext_resource type="Script" path="res://scripts/GalaxyMap3D.gd" id="8_gm3d"]
 [ext_resource type="Script" path="res://scripts/CameraControl.gd" id="9_cam"]
+[ext_resource type="Script" path="res://scripts/ScoutManager.gd" id="10_sm"]
 
 [sub_resource type="Environment" id="Environment_3d"]
 background_mode = 1
@@ -54,6 +55,9 @@ script = ExtResource("5_pm")
 
 [node name="MiningManager" type="Node" parent="Managers"]
 script = ExtResource("6_mm")
+
+[node name="ScoutManager" type="Node" parent="Managers"]
+script = ExtResource("10_sm")
 
 [node name="CombatManager" type="Node" parent="Managers"]
 script = ExtResource("7_cm")
@@ -157,6 +161,10 @@ text = "Jump to Selected"
 [node name="ScanButton" type="Button" parent="UI/Control/ActionButtons"]
 layout_mode = 2
 text = "Scan System"
+
+[node name="LaunchScoutButton" type="Button" parent="UI/Control/ActionButtons"]
+layout_mode = 2
+text = "Launch Scout"
 
 [node name="AssignMinerButton" type="Button" parent="UI/Control/ActionButtons"]
 layout_mode = 2

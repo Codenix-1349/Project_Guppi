@@ -3,6 +3,7 @@ extends Node
 @onready var turn_manager = $Managers/TurnManager
 @onready var mothership = $Managers/Mothership
 @onready var scan_manager = $Managers/ScanManager
+@onready var scout_manager = $Managers/ScoutManager
 @onready var printer_manager = $Managers/PrinterManager
 @onready var combat_manager = $Managers/CombatManager
 @onready var mining_manager = $Managers/MiningManager
@@ -19,6 +20,7 @@ extends Node
 
 @onready var jump_button = $UI/Control/ActionButtons/JumpButton
 @onready var scan_button = $UI/Control/ActionButtons/ScanButton
+@onready var launch_scout_btn = $UI/Control/ActionButtons/LaunchScoutButton
 @onready var deploy_miner_btn = $UI/Control/ActionButtons/AssignMinerButton
 @onready var combat_log = $UI/Control/CombatLog
 @onready var info_label = $UI/Control/InfoPanel/Label
@@ -44,6 +46,7 @@ func _ready():
 	
 	jump_button.pressed.connect(_on_jump_pressed)
 	scan_button.pressed.connect(_on_scan_pressed)
+	launch_scout_btn.pressed.connect(_on_launch_scout_pressed)
 	deploy_miner_btn.pressed.connect(_on_deploy_miner_pressed)
 	
 	printer_manager.printer_updated.connect(_on_printer_updated)
@@ -226,6 +229,48 @@ func _on_scan_pressed():
 			galaxy_map.update_selection_visuals()
 		update_ui()
 
+func update_scout_button():
+	var s_idx = galaxy_map.selected_system_index
+	if s_idx < 0:
+		launch_scout_btn.disabled = true
+		return
+		
+	var system = galaxy_map.systems[s_idx]
+	if system.scanned:
+		launch_scout_btn.disabled = true
+		return
+		
+	var m_pos = galaxy_map.systems[mothership.get_current_system()].position
+	var t_pos = system.position
+	var scout_data = Global.get_drone_by_id("scout_v1")
+	var s_range = scout_data.stats.get("scan_range", 700)
+	
+	var in_range = scout_manager.can_scout_system(m_pos, t_pos, s_range)
+	var has_scout = printer_manager.inventory.get("scout_v1", 0) > 0
+	
+	launch_scout_btn.disabled = !in_range or !has_scout or turn_manager.current_phase != turn_manager.Phase.PLANNING
+
+func _on_launch_scout_pressed():
+	var s_idx = galaxy_map.selected_system_index
+	if s_idx < 0: return
+	
+	var system = galaxy_map.systems[s_idx]
+	if scout_manager.launch_scout(system, scan_manager):
+		if galaxy_map is Node2D:
+			galaxy_map.queue_redraw()
+		else:
+			galaxy_map.update_selection_visuals()
+		_show_temporary_message("SCOUT SUCCESS: DATA RECOVERED")
+		update_ui()
+	else:
+		_show_temporary_message("SCOUT ERROR: NO DRONES OR ENERGY")
+
+func _show_temporary_message(msg: String):
+	combat_log.text = msg
+	combat_log.visible = true
+	await get_tree().create_timer(3.0).timeout
+	combat_log.visible = false
+
 func _on_end_turn_pressed():
 	if turn_manager.current_phase == turn_manager.Phase.PLANNING:
 		turn_manager.end_planning()
@@ -239,6 +284,7 @@ func _on_phase_changed(new_phase):
 	var is_planning = (new_phase == turn_manager.Phase.PLANNING)
 	jump_button.disabled = !is_planning
 	scan_button.disabled = !is_planning
+	# launch_scout_btn is handled by update_scout_button via update_ui
 	print_scout_btn.disabled = !is_planning
 	print_miner_btn.disabled = !is_planning
 	print_defender_btn.disabled = !is_planning
@@ -272,6 +318,7 @@ func update_ui():
 	
 	# System / Planet Info Logic
 	_update_detailed_info()
+	update_scout_button()
 	
 	# Update printer slots
 	for i in range(3):
