@@ -4,14 +4,56 @@ extends Node
 
 var drones_data = []
 var modules_data = []
+var enemies_data = []
+
+signal xp_gained(amount)
 
 var resources = {
 	"energy": 100,
 	"iron": 50,
-	"titanium": 0,
-	"uranium": 0,
+	"titanium": 20,
+	"uranium": 10,
 	"data": 0
 }
+
+var mothership_level: int = 1
+var xp: int = 0
+var xp_to_next_level: int = 100
+
+var mothership_hp: int = 100
+var max_mothership_hp: int = 100
+
+var max_energy: int = 100
+
+func gain_xp(amount: int):
+	xp += amount
+	emit_signal("xp_gained", amount)
+	if xp >= xp_to_next_level:
+		level_up()
+
+func level_up():
+	mothership_level += 1
+	xp -= xp_to_next_level
+	xp_to_next_level = int(xp_to_next_level * 1.5)
+	max_energy += 20
+	resources.energy = max_energy # Refill energy on level up
+	print("LEVEL UP! Reached level ", mothership_level)
+
+func reset_game():
+	mothership_level = 1
+	xp = 0
+	xp_to_next_level = 100
+	mothership_hp = 100
+	max_mothership_hp = 100
+	max_energy = 100
+	resources = {
+		"energy": 100,
+		"iron": 50,
+		"titanium": 20,
+		"uranium": 10,
+		"data": 0
+	}
+	print("Game resources reset.")
 
 func _ready():
 	load_game_data()
@@ -19,6 +61,7 @@ func _ready():
 func load_game_data():
 	drones_data = load_json("res://data/drones.json").get("drones", [])
 	modules_data = load_json("res://data/modules.json").get("modules", [])
+	enemies_data = load_json("res://data/enemies.json").get("enemies", [])
 	print("Game data loaded.")
 
 func load_json(path):

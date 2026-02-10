@@ -40,8 +40,16 @@ func generate_map_3d():
 			"name": "System " + str(i),
 			"position": Vector3(randf_range(-spread_size, spread_size), randf_range(-spread_size/5, spread_size/5), randf_range(-spread_size, spread_size)),
 			"planets": [],
-			"scanned": false
+			"scanned": false,
+			"enemies": []
 		}
+		
+		# Spawn enemies (30% chance)
+		if i > 1 and randf() < 0.3:
+			var enemy_type = Global.enemies_data[randi() % Global.enemies_data.size()]
+			var count = randi_range(1, 4)
+			for c in range(count):
+				system.enemies.append(enemy_type.duplicate(true))
 		
 		# Generate 2-5 planets
 		var planet_count = randi_range(2, 5)
@@ -109,8 +117,12 @@ func update_selection_visuals():
 			mat.emission = Color(0, 0.8, 1.0)
 			mat.emission_energy_multiplier = 2.0
 		elif systems[i].scanned:
-			mat.emission = Color(0.1, 0.6, 0.1)
-			mat.emission_energy_multiplier = 1.0
+			if systems[i].enemies.size() > 0:
+				mat.emission = Color(1.0, 0.2, 0.2) # Pulsing red for enemies
+				mat.emission_energy_multiplier = 2.0
+			else:
+				mat.emission = Color(0.1, 0.6, 0.1)
+				mat.emission_energy_multiplier = 1.0
 		else:
 			mat.emission = Color(0.2, 0.4, 0.6)
 			mat.emission_energy_multiplier = 0.5

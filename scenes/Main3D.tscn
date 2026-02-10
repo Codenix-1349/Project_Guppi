@@ -115,6 +115,12 @@ theme_override_colors/font_color = Color(0.4, 0.4, 1, 1)
 theme_override_font_sizes/font_size = 18
 text = "Data: 0"
 
+[node name="HPLabel" type="Label" parent="UI/Control/ResourceBar"]
+layout_mode = 2
+theme_override_colors/font_color = Color(1, 0, 0, 1)
+theme_override_font_sizes/font_size = 18
+text = "HP: 100"
+
 [node name="TurnInfo" type="VBoxContainer" parent="UI/Control"]
 layout_mode = 1
 anchors_preset = 1
@@ -136,6 +142,12 @@ horizontal_alignment = 2
 layout_mode = 2
 theme_override_colors/font_color = Color(0.8, 0.8, 0.8, 1)
 text = "Phase: Planning"
+horizontal_alignment = 2
+
+[node name="LevelLabel" type="Label" parent="UI/Control/TurnInfo"]
+layout_mode = 2
+theme_override_colors/font_color = Color(1, 1, 0, 1)
+text = "LVL: 1 (XP: 0/100)"
 horizontal_alignment = 2
 
 [node name="EndTurnButton" type="Button" parent="UI/Control/TurnInfo"]
@@ -301,3 +313,50 @@ text = "Miner"
 [node name="PrintDefender" type="Button" parent="UI/Control/Fabricator"]
 layout_mode = 2
 text = "Defender"
+
+[node name="GameOverLayer" type="CanvasLayer" parent="."]
+visible = false
+
+[node name="ColorRect" type="ColorRect" parent="GameOverLayer"]
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+color = Color(0, 0, 0, 0.705882)
+
+[node name="CenterContainer" type="CenterContainer" parent="GameOverLayer"]
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+
+[node name="PanelContainer" type="PanelContainer" parent="GameOverLayer/CenterContainer"]
+custom_minimum_size = Vector2(300, 200)
+layout_mode = 2
+
+[node name="VBox" type="VBoxContainer" parent="GameOverLayer/CenterContainer/PanelContainer"]
+layout_mode = 2
+theme_override_constants/separation = 20
+alignment = 1
+
+[node name="Label" type="Label" parent="GameOverLayer/CenterContainer/PanelContainer/VBox"]
+layout_mode = 2
+theme_override_colors/font_color = Color(1, 0, 0, 1)
+theme_override_font_sizes/font_size = 32
+text = "MISSION FEHLGESCHLAGEN"
+horizontal_alignment = 1
+
+[node name="Reason" type="Label" parent="GameOverLayer/CenterContainer/PanelContainer/VBox"]
+layout_mode = 2
+text = "Das Mutterschiff wurde zerstört."
+horizontal_alignment = 1
+
+[node name="RestartButton" type="Button" parent="GameOverLayer/CenterContainer/PanelContainer/VBox"]
+custom_minimum_size = Vector2(120, 40)
+layout_mode = 2
+size_flags_horizontal = 4
+text = "NEUSTART"
+
+[connection signal="pressed" from="GameOverLayer/CenterContainer/PanelContainer/VBox/RestartButton" to="." method="_on_restart_pressed"]

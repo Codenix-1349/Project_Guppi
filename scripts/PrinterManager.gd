@@ -25,33 +25,35 @@ func _ready():
 	inventory["miner_v1"] = 2
 	print("Printer Manager initialized with 2 starting Miners.")
 
-func add_job(drone: Dictionary):
+func add_job(drone: Dictionary) -> Dictionary:
 	# Find free slot
+	var free_slot = -1
 	for i in range(slots.size()):
 		if slots[i] == null:
-			# Check costs dynamically
-			var has_resources = true
-			for res in drone.cost:
-				if Global.resources.get(res, 0) < drone.cost[res]:
-					has_resources = false
-					break
+			free_slot = i
+			break
 			
-			if has_resources:
-				# Deduct costs
-				for res in drone.cost:
-					Global.resources[res] -= drone.cost[res]
-				
-				# Tier 1 drones take 2 turns (placeholder logic)
-				slots[i] = Job.new(drone.id, drone.name, 2)
-				emit_signal("printer_updated")
-				print("Started printing ", drone.name, " in slot ", i)
-				return true
-			else:
-				print("Insufficient resources to print ", drone.name)
-				return false
-				
-	print("No free printer slots!")
-	return false
+	if free_slot == -1:
+		return {"success": false, "message": "NO FREE PRINTER SLOTS!"}
+			
+	# Check costs dynamically
+	var missing_resources = []
+	for res in drone.cost:
+		if Global.resources.get(res, 0) < drone.cost[res]:
+			missing_resources.append(res.capitalize())
+			
+	if missing_resources.size() > 0:
+		return {"success": false, "message": "INSUFFICIENT RESOURCES: " + ", ".join(missing_resources)}
+	
+	# Deduct costs
+	for res in drone.cost:
+		Global.resources[res] -= drone.cost[res]
+	
+	# Tier 1 drones take 2 turns (placeholder logic)
+	slots[free_slot] = Job.new(drone.id, drone.name, 2)
+	emit_signal("printer_updated")
+	print("Started printing ", drone.name, " in slot ", free_slot)
+	return {"success": true, "message": "STARTED PRINTING: " + drone.name.to_upper()}
 
 func process_turn():
 	for i in range(slots.size()):
