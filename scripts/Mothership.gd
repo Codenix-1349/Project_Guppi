@@ -1,0 +1,29 @@
+extends Node
+
+# Tracks the state of the player's Mothership
+
+var current_system_index: int = 0
+var jump_cost: int = 20
+
+signal system_changed(new_index)
+signal energy_depleted()
+
+func _ready():
+	print("Mothership initialized at system ", current_system_index)
+
+func jump_to_system(system_index: int):
+	# Check if enough energy
+	if Global.resources.energy < jump_cost:
+		print("Insufficient energy for jump!")
+		emit_signal("energy_depleted")
+		return false
+	
+	# Consume energy
+	Global.resources.energy -= jump_cost
+	current_system_index = system_index
+	emit_signal("system_changed", current_system_index)
+	print("Mothership jumped to system ", system_index)
+	return true
+
+func get_current_system():
+	return current_system_index

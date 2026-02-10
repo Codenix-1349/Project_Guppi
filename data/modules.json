@@ -1,0 +1,66 @@
+{
+  "modules": [
+    {
+      "id": "engine_ion_v1",
+      "name": "Ion Engine",
+      "type": "ENGINE",
+      "tier": 1,
+      "cost": {
+        "raw_ore": 100,
+        "data": 50
+      },
+      "effects": {
+        "jump_range": 1,
+        "energy_cost_modifier": -0.1
+      },
+      "description": "Standard ion propulsion for short jumps."
+    },
+    {
+      "id": "railgun_v1",
+      "name": "Light Railgun",
+      "type": "WEAPON",
+      "tier": 1,
+      "cost": {
+        "raw_ore": 150,
+        "rare_metals": 20,
+        "data": 80
+      },
+      "effects": {
+        "mothership_firepower": 20,
+        "mothership_range": 2
+      },
+      "description": "Kinetic weapon system for long-range defense."
+    },
+    {
+      "id": "sensor_array_v1",
+      "name": "Active Sensor Array",
+      "type": "SENSOR",
+      "tier": 1,
+      "cost": {
+        "raw_ore": 80,
+        "data": 120
+      },
+      "effects": {
+        "scan_resolution": 1.5,
+        "anomaly_detection_chance": 0.1
+      },
+      "description": "Broad-spectrum sensors for detecting hidden objects."
+    },
+    {
+      "id": "printer_boost_v1",
+      "name": "Overdrive Printer",
+      "type": "PRINTER",
+      "tier": 1,
+      "cost": {
+        "raw_ore": 200,
+        "rare_metals": 50,
+        "data": 200
+      },
+      "effects": {
+        "printer_slots": 1,
+        "print_speed": 1.2
+      },
+      "description": "Expands fabrication capacity and speed."
+    }
+  ]
+}

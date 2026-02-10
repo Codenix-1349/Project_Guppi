@@ -1,0 +1,295 @@
+[gd_scene format=3 uid="uid://df6y4n4y4k1xq"]
+
+[ext_resource type="Script" path="res://scripts/Main.gd" id="1_main"]
+[ext_resource type="Script" path="res://scripts/TurnManager.gd" id="2_tm"]
+[ext_resource type="Script" path="res://scripts/Mothership.gd" id="3_ms"]
+[ext_resource type="Script" path="res://scripts/ScanManager.gd" id="4_sm"]
+[ext_resource type="Script" path="res://scripts/PrinterManager.gd" id="5_pm"]
+[ext_resource type="Script" path="res://scripts/MiningManager.gd" id="6_mm"]
+[ext_resource type="Script" path="res://scripts/CombatManager.gd" id="7_cm"]
+[ext_resource type="Script" path="res://scripts/GalaxyMap3D.gd" id="8_gm3d"]
+[ext_resource type="Script" path="res://scripts/CameraControl.gd" id="9_cam"]
+
+[sub_resource type="Environment" id="Environment_3d"]
+background_mode = 1
+background_color = Color(0.02, 0.02, 0.05, 1)
+glow_enabled = true
+glow_intensity = 0.8
+glow_strength = 1.0
+glow_bloom = 0.3
+glow_blend_mode = 1
+volumetric_fog_enabled = true
+volumetric_fog_density = 0.01
+
+[node name="Main3D" type="Node3D"]
+script = ExtResource("1_main")
+
+[node name="WorldEnvironment" type="WorldEnvironment" parent="."]
+environment = SubResource("Environment_3d")
+
+[node name="DirectionalLight3D" type="DirectionalLight3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, -0.707107, 0.707107, 0, -0.707107, -0.707107, 0, 10, 0)
+light_energy = 0.5
+
+[node name="CameraPivot" type="Node3D" parent="."]
+script = ExtResource("9_cam")
+
+[node name="Camera3D" type="Camera3D" parent="CameraPivot"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 40)
+current = true
+
+[node name="Managers" type="Node" parent="."]
+
+[node name="TurnManager" type="Node" parent="Managers"]
+script = ExtResource("2_tm")
+
+[node name="Mothership" type="Node" parent="Managers"]
+script = ExtResource("3_ms")
+
+[node name="ScanManager" type="Node" parent="Managers"]
+script = ExtResource("4_sm")
+
+[node name="PrinterManager" type="Node" parent="Managers"]
+script = ExtResource("5_pm")
+
+[node name="MiningManager" type="Node" parent="Managers"]
+script = ExtResource("6_mm")
+
+[node name="CombatManager" type="Node" parent="Managers"]
+script = ExtResource("7_cm")
+
+[node name="GalaxyMap3D" type="Node3D" parent="."]
+script = ExtResource("8_gm3d")
+
+[node name="UI" type="CanvasLayer" parent="."]
+
+[node name="Control" type="Control" parent="UI"]
+layout_mode = 3
+mouse_filter = 2
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+
+[node name="ResourceBar" type="HBoxContainer" parent="UI/Control"]
+layout_mode = 1
+anchors_preset = 10
+anchor_right = 1.0
+offset_bottom = 60.0
+grow_horizontal = 2
+theme_override_constants/separation = 40
+alignment = 1
+
+[node name="EnergyLabel" type="Label" parent="UI/Control/ResourceBar"]
+layout_mode = 2
+theme_override_colors/font_color = Color(0, 1, 1, 1)
+theme_override_font_sizes/font_size = 18
+text = "Energy: 100"
+
+[node name="IronLabel" type="Label" parent="UI/Control/ResourceBar"]
+layout_mode = 2
+theme_override_colors/font_color = Color(0.8, 0.8, 0.8, 1)
+theme_override_font_sizes/font_size = 18
+text = "Iron: 50"
+
+[node name="TitaniumLabel" type="Label" parent="UI/Control/ResourceBar"]
+layout_mode = 2
+theme_override_colors/font_color = Color(0.6, 0.6, 1, 1)
+theme_override_font_sizes/font_size = 18
+text = "Titanium: 0"
+
+[node name="UraniumLabel" type="Label" parent="UI/Control/ResourceBar"]
+layout_mode = 2
+theme_override_colors/font_color = Color(0.2, 1, 0.2, 1)
+theme_override_font_sizes/font_size = 18
+text = "Uranium: 0"
+
+[node name="DataLabel" type="Label" parent="UI/Control/ResourceBar"]
+layout_mode = 2
+theme_override_colors/font_color = Color(0.4, 0.4, 1, 1)
+theme_override_font_sizes/font_size = 18
+text = "Data: 0"
+
+[node name="TurnInfo" type="VBoxContainer" parent="UI/Control"]
+layout_mode = 1
+anchors_preset = 1
+anchor_left = 1.0
+anchor_right = 1.0
+offset_left = -180.0
+offset_top = 20.0
+offset_right = -20.0
+offset_bottom = 120.0
+grow_horizontal = 0
+
+[node name="TurnLabel" type="Label" parent="UI/Control/TurnInfo"]
+layout_mode = 2
+theme_override_font_sizes/font_size = 20
+text = "Turn: 1"
+horizontal_alignment = 2
+
+[node name="PhaseLabel" type="Label" parent="UI/Control/TurnInfo"]
+layout_mode = 2
+theme_override_colors/font_color = Color(0.8, 0.8, 0.8, 1)
+text = "Phase: Planning"
+horizontal_alignment = 2
+
+[node name="EndTurnButton" type="Button" parent="UI/Control/TurnInfo"]
+layout_mode = 2
+text = "End Planning"
+
+[node name="ActionButtons" type="VBoxContainer" parent="UI/Control"]
+layout_mode = 1
+anchors_preset = 2
+anchor_top = 1.0
+anchor_bottom = 1.0
+offset_left = 20.0
+offset_top = -120.0
+offset_right = 170.0
+offset_bottom = -20.0
+grow_vertical = 0
+theme_override_constants/separation = 10
+
+[node name="JumpButton" type="Button" parent="UI/Control/ActionButtons"]
+layout_mode = 2
+text = "Jump to Selected"
+
+[node name="ScanButton" type="Button" parent="UI/Control/ActionButtons"]
+layout_mode = 2
+text = "Scan System"
+
+[node name="AssignMinerButton" type="Button" parent="UI/Control/ActionButtons"]
+layout_mode = 2
+text = "Deploy Miner"
+
+[node name="CombatLog" type="Label" parent="UI/Control"]
+visible = false
+layout_mode = 1
+anchors_preset = 8
+anchor_left = 0.5
+anchor_top = 0.5
+anchor_right = 0.5
+anchor_bottom = 0.5
+offset_left = -150.0
+offset_top = -100.0
+offset_right = 150.0
+offset_bottom = -20.0
+grow_horizontal = 2
+grow_vertical = 2
+theme_override_colors/font_color = Color(1, 0, 0, 1)
+theme_override_colors/font_outline_color = Color(0.4, 0, 0, 1)
+theme_override_constants/outline_size = 4
+theme_override_font_sizes/font_size = 24
+text = "COMBAT ALERT!"
+horizontal_alignment = 1
+
+[node name="InfoPanel" type="PanelContainer" parent="UI/Control"]
+layout_mode = 1
+anchors_preset = 7
+anchor_left = 0.5
+anchor_top = 1.0
+anchor_right = 0.5
+anchor_bottom = 1.0
+offset_left = -250.0
+offset_top = -140.0
+offset_right = 250.0
+offset_bottom = -70.0
+grow_horizontal = 2
+grow_vertical = 2
+
+[node name="Label" type="Label" parent="UI/Control/InfoPanel"]
+layout_mode = 2
+theme_override_colors/font_color = Color(0.7, 0.9, 1, 1)
+theme_override_font_sizes/font_size = 14
+text = "Hover over a unit to see details..."
+horizontal_alignment = 1
+vertical_alignment = 1
+autowrap_mode = 3
+
+[node name="SystemPanel" type="PanelContainer" parent="UI/Control"]
+layout_mode = 1
+anchors_preset = 4
+anchor_top = 0.5
+anchor_bottom = 0.5
+offset_left = 20.0
+offset_top = -200.0
+offset_right = 320.0
+offset_bottom = 100.0
+grow_vertical = 2
+
+[node name="VBox" type="VBoxContainer" parent="UI/Control/SystemPanel"]
+layout_mode = 2
+theme_override_constants/separation = 10
+
+[node name="Title" type="Label" parent="UI/Control/SystemPanel/VBox"]
+layout_mode = 2
+theme_override_colors/font_color = Color(0, 0.8, 1, 1)
+theme_override_font_sizes/font_size = 18
+text = "SYSTEM INFO"
+horizontal_alignment = 1
+
+[node name="Content" type="RichTextLabel" parent="UI/Control/SystemPanel/VBox"]
+layout_mode = 2
+size_flags_vertical = 3
+bbcode_enabled = true
+text = "Select a star system..."
+
+[node name="PrinterStatus" type="VBoxContainer" parent="UI/Control"]
+layout_mode = 1
+anchors_preset = 3
+anchor_left = 1.0
+anchor_top = 1.0
+anchor_right = 1.0
+anchor_bottom = 1.0
+offset_left = -220.0
+offset_top = -150.0
+offset_right = -20.0
+offset_bottom = -20.0
+grow_horizontal = 0
+grow_vertical = 0
+theme_override_constants/separation = 5
+
+[node name="Header" type="Label" parent="UI/Control/PrinterStatus"]
+layout_mode = 2
+text = "Printers"
+horizontal_alignment = 1
+
+[node name="Slot0" type="ProgressBar" parent="UI/Control/PrinterStatus"]
+layout_mode = 2
+size_flags_vertical = 4
+
+[node name="Slot1" type="ProgressBar" parent="UI/Control/PrinterStatus"]
+layout_mode = 2
+size_flags_vertical = 4
+
+[node name="Slot2" type="ProgressBar" parent="UI/Control/PrinterStatus"]
+layout_mode = 2
+size_flags_vertical = 4
+
+[node name="Fabricator" type="HBoxContainer" parent="UI/Control"]
+layout_mode = 1
+anchors_preset = 7
+anchor_left = 0.5
+anchor_top = 1.0
+anchor_right = 0.5
+anchor_bottom = 1.0
+offset_left = -200.0
+offset_top = -60.0
+offset_right = 200.0
+offset_bottom = -20.0
+grow_horizontal = 2
+grow_vertical = 0
+alignment = 1
+theme_override_constants/separation = 10
+
+[node name="PrintScout" type="Button" parent="UI/Control/Fabricator"]
+layout_mode = 2
+text = "Scout"
+
+[node name="PrintMiner" type="Button" parent="UI/Control/Fabricator"]
+layout_mode = 2
+text = "Miner"
+
+[node name="PrintDefender" type="Button" parent="UI/Control/Fabricator"]
+layout_mode = 2
+text = "Defender"
