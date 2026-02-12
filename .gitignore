@@ -12,3 +12,10 @@ mono_crash_*.json
 *.log
 .DS_Store
 Thumbs.db
+
+# Godot temp
+*.tmp
+
+# Local asset packs (do not commit)
+kenney_space-kit.zip
+kenney_space-kit/

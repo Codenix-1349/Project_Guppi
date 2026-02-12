@@ -1,34 +1,34 @@
 {
   "enemies": [
-    {
-      "id": "drone_swarm_v1",
-      "name": "Automated Swarm",
-      "description": "Small, fast automated drones. Weak individually but dangerous in groups.",
-      "stats": {
-        "firepower": 1,
-        "durability": 5,
-        "speed": 8
-      }
-    },
-    {
-      "id": "corsair_v1",
-      "name": "Rogue Corsair",
-      "description": "A medium-sized pirate vessel. Balanced weapons and armor.",
-      "stats": {
-        "firepower": 5,
-        "durability": 25,
-        "speed": 5
-      }
-    },
-    {
-      "id": "fortress_v1",
-      "name": "Ancient Sentry",
-      "description": "Heavy automated defense platform. Extremely high durability.",
-      "stats": {
-        "firepower": 12,
-        "durability": 100,
-        "speed": 0
-      }
-    }
+	{
+	  "id": "drone_swarm_v1",
+	  "name": "Automated Swarm",
+	  "description": "Small, fast automated drones. Weak individually but dangerous in groups.",
+	  "stats": {
+		"firepower": 1,
+		"durability": 5,
+		"speed": 8
+	  }
+	},
+	{
+	  "id": "corsair_v1",
+	  "name": "Rogue Corsair",
+	  "description": "A medium-sized pirate vessel. Balanced weapons and armor.",
+	  "stats": {
+		"firepower": 5,
+		"durability": 25,
+		"speed": 5
+	  }
+	},
+	{
+	  "id": "fortress_v1",
+	  "name": "Ancient Sentry",
+	  "description": "Heavy automated defense platform. Extremely high durability.",
+	  "stats": {
+		"firepower": 12,
+		"durability": 100,
+		"speed": 0
+	  }
+	}
   ]
 }
