@@ -47,5 +47,13 @@ Das Spiel benötigt die Godot Engine (getestet mit Version 4.x).
 *   [Download für Windows](https://godotengine.org/download/windows/)
 *   [Godot auf Steam](https://store.steampowered.com/app/404790/Godot_Engine/?l=german)
 
+
+## 📚 Documentation
+
+- [Strategic Roadmap](docs/roadmap/Strategic_Roadmap.md)
+- [Game Design Document](docs/design/GDD.md)
+- [Technical Architecture](docs/technical/Technical_Architecture.md)
+
+
 ---
 *Viel Erfolg beim Überleben im Sektor, Commander!*
