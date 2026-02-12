@@ -2,12 +2,13 @@
   "drones": [
     {
       "id": "scout_v1",
-      "name": "Scout Drone",
+      "name": "Scout",
       "description": "Fast unit for system scanning. High speed, no armor.",
       "cost": {
         "iron": 10,
         "energy": 20
       },
+      "build_time": 1,
       "stats": {
         "firepower": 2,
         "durability": 5,
@@ -17,11 +18,12 @@
     },
     {
       "id": "miner_v1",
-      "name": "Basic Miner",
+      "name": "Miner",
       "description": "Extracts raw ore from systems. Round-based income unit.",
       "cost": {
         "iron": 25
       },
+      "build_time": 2,
       "stats": {
         "firepower": 1,
         "durability": 15,
@@ -36,6 +38,7 @@
         "iron": 40,
         "energy": 10
       },
+      "build_time": 3,
       "stats": {
         "firepower": 8,
         "durability": 30,

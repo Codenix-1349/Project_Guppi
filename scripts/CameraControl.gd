@@ -59,3 +59,11 @@ func _zoom(amount: float):
 	var pos = camera.position
 	pos.z = clamp(pos.z + amount, min_zoom, max_zoom)
 	camera.position = pos
+
+func focus_on(target_pos: Vector3):
+	# Create a tween for smooth movement
+	var tween = create_tween().set_parallel(true)
+	tween.tween_property(pivot, "global_position", target_pos, 0.5).set_trans(Tween.TRANS_SINE)
+	# Also zoom in slightly (to 15 units distance if further away)
+	var target_zoom = min(camera.position.z, 20.0)
+	tween.tween_property(camera, "position:z", target_zoom, 0.5).set_trans(Tween.TRANS_SINE)

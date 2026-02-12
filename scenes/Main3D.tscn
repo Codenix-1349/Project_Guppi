@@ -1,82 +1,94 @@
 [gd_scene format=3 uid="uid://df6y4n4y4k1xq"]
 
-[ext_resource type="Script" path="res://scripts/Main.gd" id="1_main"]
-[ext_resource type="Script" path="res://scripts/TurnManager.gd" id="2_tm"]
-[ext_resource type="Script" path="res://scripts/Mothership.gd" id="3_ms"]
-[ext_resource type="Script" path="res://scripts/ScanManager.gd" id="4_sm"]
-[ext_resource type="Script" path="res://scripts/PrinterManager.gd" id="5_pm"]
-[ext_resource type="Script" path="res://scripts/MiningManager.gd" id="6_mm"]
-[ext_resource type="Script" path="res://scripts/CombatManager.gd" id="7_cm"]
-[ext_resource type="Script" path="res://scripts/GalaxyMap3D.gd" id="8_gm3d"]
-[ext_resource type="Script" path="res://scripts/CameraControl.gd" id="9_cam"]
-[ext_resource type="Script" path="res://scripts/ScoutManager.gd" id="10_sm"]
+[ext_resource type="Script" uid="uid://cj2pfhg581c4p" path="res://scripts/Main.gd" id="1_main"]
+[ext_resource type="Script" uid="uid://bk2qpveefabux" path="res://scripts/TurnManager.gd" id="2_tm"]
+[ext_resource type="Script" uid="uid://dhu6d88cq786q" path="res://scripts/Mothership.gd" id="3_ms"]
+[ext_resource type="Script" uid="uid://ts7cl6q52ln5" path="res://scripts/ScanManager.gd" id="4_sm"]
+[ext_resource type="Script" uid="uid://c4rsltajpydlt" path="res://scripts/PrinterManager.gd" id="5_pm"]
+[ext_resource type="Script" uid="uid://cp0pojl4aygbf" path="res://scripts/MiningManager.gd" id="6_mm"]
+[ext_resource type="Script" uid="uid://bcteml2l88t25" path="res://scripts/CombatManager.gd" id="7_cm"]
+[ext_resource type="Script" uid="uid://c6a14an0f8w6s" path="res://scripts/GalaxyMap3D.gd" id="8_gm3d"]
+[ext_resource type="Script" uid="uid://bvqemm6fhux4o" path="res://scripts/CameraControl.gd" id="9_cam"]
+[ext_resource type="Script" uid="uid://bql3svy8g3tlj" path="res://scripts/ScoutManager.gd" id="10_sm"]
+
+[sub_resource type="ProceduralSkyMaterial" id="ProceduralSkyMaterial_space"]
+sky_top_color = Color(0, 0, 0, 1)
+sky_horizon_color = Color(0.05, 0.05, 0.1, 1)
+ground_bottom_color = Color(0, 0, 0, 1)
+ground_horizon_color = Color(0.05, 0.05, 0.1, 1)
+sun_angle_max = 0.0
+
+[sub_resource type="Sky" id="Sky_space"]
+sky_material = SubResource("ProceduralSkyMaterial_space")
 
 [sub_resource type="Environment" id="Environment_3d"]
-background_mode = 1
-background_color = Color(0.02, 0.02, 0.05, 1)
+background_mode = 2
+sky = SubResource("Sky_space")
+ambient_light_source = 2
+ambient_light_color = Color(0.1, 0.1, 0.2, 1)
 glow_enabled = true
-glow_intensity = 0.8
-glow_strength = 1.0
-glow_bloom = 0.3
-glow_blend_mode = 1
+glow_intensity = 1.5
+glow_strength = 1.2
+glow_bloom = 0.5
 volumetric_fog_enabled = true
-volumetric_fog_density = 0.01
+volumetric_fog_density = 0.005
+volumetric_fog_albedo = Color(0.1, 0.1, 0.3, 1)
 
-[node name="Main3D" type="Node3D"]
+[node name="Main3D" type="Node3D" unique_id=1655388965]
 script = ExtResource("1_main")
 
-[node name="WorldEnvironment" type="WorldEnvironment" parent="."]
+[node name="WorldEnvironment" type="WorldEnvironment" parent="." unique_id=145811888]
 environment = SubResource("Environment_3d")
 
-[node name="DirectionalLight3D" type="DirectionalLight3D" parent="."]
+[node name="DirectionalLight3D" type="DirectionalLight3D" parent="." unique_id=390888318]
 transform = Transform3D(1, 0, 0, 0, -0.707107, 0.707107, 0, -0.707107, -0.707107, 0, 10, 0)
 light_energy = 0.5
 
-[node name="CameraPivot" type="Node3D" parent="."]
+[node name="CameraPivot" type="Node3D" parent="." unique_id=1556583943]
 script = ExtResource("9_cam")
 
-[node name="Camera3D" type="Camera3D" parent="CameraPivot"]
+[node name="Camera3D" type="Camera3D" parent="CameraPivot" unique_id=605370718]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 40)
 current = true
 
-[node name="Managers" type="Node" parent="."]
+[node name="Managers" type="Node" parent="." unique_id=1881784014]
 
-[node name="TurnManager" type="Node" parent="Managers"]
+[node name="TurnManager" type="Node" parent="Managers" unique_id=2060323392]
 script = ExtResource("2_tm")
 
-[node name="Mothership" type="Node" parent="Managers"]
+[node name="Mothership" type="Node" parent="Managers" unique_id=1270629068]
 script = ExtResource("3_ms")
 
-[node name="ScanManager" type="Node" parent="Managers"]
+[node name="ScanManager" type="Node" parent="Managers" unique_id=143543885]
 script = ExtResource("4_sm")
 
-[node name="PrinterManager" type="Node" parent="Managers"]
+[node name="PrinterManager" type="Node" parent="Managers" unique_id=1018795426]
 script = ExtResource("5_pm")
 
-[node name="MiningManager" type="Node" parent="Managers"]
+[node name="MiningManager" type="Node" parent="Managers" unique_id=603190125]
 script = ExtResource("6_mm")
 
-[node name="ScoutManager" type="Node" parent="Managers"]
+[node name="ScoutManager" type="Node" parent="Managers" unique_id=454374398]
 script = ExtResource("10_sm")
 
-[node name="CombatManager" type="Node" parent="Managers"]
+[node name="CombatManager" type="Node" parent="Managers" unique_id=471052091]
 script = ExtResource("7_cm")
 
-[node name="GalaxyMap3D" type="Node3D" parent="."]
+[node name="GalaxyMap3D" type="Node3D" parent="." unique_id=1369186963]
 script = ExtResource("8_gm3d")
 
-[node name="UI" type="CanvasLayer" parent="."]
+[node name="UI" type="CanvasLayer" parent="." unique_id=649586879]
 
-[node name="Control" type="Control" parent="UI"]
+[node name="Control" type="Control" parent="UI" unique_id=820168113]
 layout_mode = 3
-mouse_filter = 2
 anchors_preset = 15
 anchor_right = 1.0
 anchor_bottom = 1.0
 grow_horizontal = 2
 grow_vertical = 2
+mouse_filter = 2
 
-[node name="ResourceBar" type="HBoxContainer" parent="UI/Control"]
+[node name="ResourceBar" type="HBoxContainer" parent="UI/Control" unique_id=992030390]
 layout_mode = 1
 anchors_preset = 10
 anchor_right = 1.0
@@ -85,43 +97,43 @@ grow_horizontal = 2
 theme_override_constants/separation = 40
 alignment = 1
 
-[node name="EnergyLabel" type="Label" parent="UI/Control/ResourceBar"]
+[node name="EnergyLabel" type="Label" parent="UI/Control/ResourceBar" unique_id=986790463]
 layout_mode = 2
 theme_override_colors/font_color = Color(0, 1, 1, 1)
 theme_override_font_sizes/font_size = 18
 text = "Energy: 100"
 
-[node name="IronLabel" type="Label" parent="UI/Control/ResourceBar"]
+[node name="IronLabel" type="Label" parent="UI/Control/ResourceBar" unique_id=1098749008]
 layout_mode = 2
 theme_override_colors/font_color = Color(0.8, 0.8, 0.8, 1)
 theme_override_font_sizes/font_size = 18
 text = "Iron: 50"
 
-[node name="TitaniumLabel" type="Label" parent="UI/Control/ResourceBar"]
+[node name="TitaniumLabel" type="Label" parent="UI/Control/ResourceBar" unique_id=1216282762]
 layout_mode = 2
 theme_override_colors/font_color = Color(0.6, 0.6, 1, 1)
 theme_override_font_sizes/font_size = 18
 text = "Titanium: 0"
 
-[node name="UraniumLabel" type="Label" parent="UI/Control/ResourceBar"]
+[node name="UraniumLabel" type="Label" parent="UI/Control/ResourceBar" unique_id=1828570437]
 layout_mode = 2
 theme_override_colors/font_color = Color(0.2, 1, 0.2, 1)
 theme_override_font_sizes/font_size = 18
 text = "Uranium: 0"
 
-[node name="DataLabel" type="Label" parent="UI/Control/ResourceBar"]
+[node name="DataLabel" type="Label" parent="UI/Control/ResourceBar" unique_id=981571005]
 layout_mode = 2
 theme_override_colors/font_color = Color(0.4, 0.4, 1, 1)
 theme_override_font_sizes/font_size = 18
 text = "Data: 0"
 
-[node name="HPLabel" type="Label" parent="UI/Control/ResourceBar"]
+[node name="HPLabel" type="Label" parent="UI/Control/ResourceBar" unique_id=2088632053]
 layout_mode = 2
 theme_override_colors/font_color = Color(1, 0, 0, 1)
 theme_override_font_sizes/font_size = 18
 text = "HP: 100"
 
-[node name="TurnInfo" type="VBoxContainer" parent="UI/Control"]
+[node name="TurnInfo" type="VBoxContainer" parent="UI/Control" unique_id=1771393493]
 layout_mode = 1
 anchors_preset = 1
 anchor_left = 1.0
@@ -132,29 +144,29 @@ offset_right = -20.0
 offset_bottom = 120.0
 grow_horizontal = 0
 
-[node name="TurnLabel" type="Label" parent="UI/Control/TurnInfo"]
+[node name="TurnLabel" type="Label" parent="UI/Control/TurnInfo" unique_id=2129447453]
 layout_mode = 2
 theme_override_font_sizes/font_size = 20
 text = "Turn: 1"
 horizontal_alignment = 2
 
-[node name="PhaseLabel" type="Label" parent="UI/Control/TurnInfo"]
+[node name="PhaseLabel" type="Label" parent="UI/Control/TurnInfo" unique_id=1816305478]
 layout_mode = 2
 theme_override_colors/font_color = Color(0.8, 0.8, 0.8, 1)
 text = "Phase: Planning"
 horizontal_alignment = 2
 
-[node name="LevelLabel" type="Label" parent="UI/Control/TurnInfo"]
+[node name="LevelLabel" type="Label" parent="UI/Control/TurnInfo" unique_id=407031380]
 layout_mode = 2
 theme_override_colors/font_color = Color(1, 1, 0, 1)
 text = "LVL: 1 (XP: 0/100)"
 horizontal_alignment = 2
 
-[node name="EndTurnButton" type="Button" parent="UI/Control/TurnInfo"]
+[node name="EndTurnButton" type="Button" parent="UI/Control/TurnInfo" unique_id=1469366809]
 layout_mode = 2
 text = "End Planning"
 
-[node name="ActionButtons" type="VBoxContainer" parent="UI/Control"]
+[node name="ActionButtons" type="VBoxContainer" parent="UI/Control" unique_id=577112137]
 layout_mode = 1
 anchors_preset = 2
 anchor_top = 1.0
@@ -166,23 +178,23 @@ offset_bottom = -20.0
 grow_vertical = 0
 theme_override_constants/separation = 10
 
-[node name="JumpButton" type="Button" parent="UI/Control/ActionButtons"]
+[node name="JumpButton" type="Button" parent="UI/Control/ActionButtons" unique_id=369299249]
 layout_mode = 2
 text = "Jump to Selected"
 
-[node name="ScanButton" type="Button" parent="UI/Control/ActionButtons"]
+[node name="ScanButton" type="Button" parent="UI/Control/ActionButtons" unique_id=1382856282]
 layout_mode = 2
 text = "Scan System"
 
-[node name="LaunchScoutButton" type="Button" parent="UI/Control/ActionButtons"]
+[node name="LaunchScoutButton" type="Button" parent="UI/Control/ActionButtons" unique_id=163791799]
 layout_mode = 2
 text = "Launch Scout"
 
-[node name="AssignMinerButton" type="Button" parent="UI/Control/ActionButtons"]
+[node name="AssignMinerButton" type="Button" parent="UI/Control/ActionButtons" unique_id=65514437]
 layout_mode = 2
 text = "Deploy Miner"
 
-[node name="CombatLog" type="Label" parent="UI/Control"]
+[node name="CombatLog" type="Label" parent="UI/Control" unique_id=12885543]
 visible = false
 layout_mode = 1
 anchors_preset = 8
@@ -203,7 +215,7 @@ theme_override_font_sizes/font_size = 24
 text = "COMBAT ALERT!"
 horizontal_alignment = 1
 
-[node name="InfoPanel" type="PanelContainer" parent="UI/Control"]
+[node name="InfoPanel" type="PanelContainer" parent="UI/Control" unique_id=2037633051]
 layout_mode = 1
 anchors_preset = 7
 anchor_left = 0.5
@@ -217,7 +229,7 @@ offset_bottom = -70.0
 grow_horizontal = 2
 grow_vertical = 2
 
-[node name="Label" type="Label" parent="UI/Control/InfoPanel"]
+[node name="Label" type="Label" parent="UI/Control/InfoPanel" unique_id=1943536141]
 layout_mode = 2
 theme_override_colors/font_color = Color(0.7, 0.9, 1, 1)
 theme_override_font_sizes/font_size = 14
@@ -226,7 +238,7 @@ horizontal_alignment = 1
 vertical_alignment = 1
 autowrap_mode = 3
 
-[node name="SystemPanel" type="PanelContainer" parent="UI/Control"]
+[node name="SystemPanel" type="PanelContainer" parent="UI/Control" unique_id=1010153677]
 layout_mode = 1
 anchors_preset = 4
 anchor_top = 0.5
@@ -237,24 +249,24 @@ offset_right = 320.0
 offset_bottom = 100.0
 grow_vertical = 2
 
-[node name="VBox" type="VBoxContainer" parent="UI/Control/SystemPanel"]
+[node name="VBox" type="VBoxContainer" parent="UI/Control/SystemPanel" unique_id=425887801]
 layout_mode = 2
 theme_override_constants/separation = 10
 
-[node name="Title" type="Label" parent="UI/Control/SystemPanel/VBox"]
+[node name="Title" type="Label" parent="UI/Control/SystemPanel/VBox" unique_id=772484760]
 layout_mode = 2
 theme_override_colors/font_color = Color(0, 0.8, 1, 1)
 theme_override_font_sizes/font_size = 18
 text = "SYSTEM INFO"
 horizontal_alignment = 1
 
-[node name="Content" type="RichTextLabel" parent="UI/Control/SystemPanel/VBox"]
+[node name="Content" type="RichTextLabel" parent="UI/Control/SystemPanel/VBox" unique_id=462397778]
 layout_mode = 2
 size_flags_vertical = 3
 bbcode_enabled = true
 text = "Select a star system..."
 
-[node name="PrinterStatus" type="VBoxContainer" parent="UI/Control"]
+[node name="PrinterStatus" type="VBoxContainer" parent="UI/Control" unique_id=579004363]
 layout_mode = 1
 anchors_preset = 3
 anchor_left = 1.0
@@ -269,24 +281,66 @@ grow_horizontal = 0
 grow_vertical = 0
 theme_override_constants/separation = 5
 
-[node name="Header" type="Label" parent="UI/Control/PrinterStatus"]
+[node name="Header" type="Label" parent="UI/Control/PrinterStatus" unique_id=119034788]
 layout_mode = 2
 text = "Printers"
 horizontal_alignment = 1
 
-[node name="Slot0" type="ProgressBar" parent="UI/Control/PrinterStatus"]
+[node name="Slot0" type="ProgressBar" parent="UI/Control/PrinterStatus" unique_id=1396107233]
+custom_minimum_size = Vector2(0, 25)
 layout_mode = 2
 size_flags_vertical = 4
+show_percentage = false
 
-[node name="Slot1" type="ProgressBar" parent="UI/Control/PrinterStatus"]
+[node name="Label" type="Label" parent="UI/Control/PrinterStatus/Slot0" unique_id=226685761]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+theme_override_font_sizes/font_size = 12
+text = "Unit Name"
+horizontal_alignment = 1
+vertical_alignment = 1
+
+[node name="Slot1" type="ProgressBar" parent="UI/Control/PrinterStatus" unique_id=120388197]
+custom_minimum_size = Vector2(0, 25)
 layout_mode = 2
 size_flags_vertical = 4
+show_percentage = false
 
-[node name="Slot2" type="ProgressBar" parent="UI/Control/PrinterStatus"]
+[node name="Label" type="Label" parent="UI/Control/PrinterStatus/Slot1" unique_id=1196368836]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+theme_override_font_sizes/font_size = 12
+text = "Unit Name"
+horizontal_alignment = 1
+vertical_alignment = 1
+
+[node name="Slot2" type="ProgressBar" parent="UI/Control/PrinterStatus" unique_id=1390071031]
+custom_minimum_size = Vector2(0, 25)
 layout_mode = 2
 size_flags_vertical = 4
+show_percentage = false
 
-[node name="Fabricator" type="HBoxContainer" parent="UI/Control"]
+[node name="Label" type="Label" parent="UI/Control/PrinterStatus/Slot2" unique_id=1229223715]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+theme_override_font_sizes/font_size = 12
+text = "Unit Name"
+horizontal_alignment = 1
+vertical_alignment = 1
+
+[node name="Fabricator" type="HBoxContainer" parent="UI/Control" unique_id=1411848719]
 layout_mode = 1
 anchors_preset = 7
 anchor_left = 0.5
@@ -299,25 +353,25 @@ offset_right = 200.0
 offset_bottom = -20.0
 grow_horizontal = 2
 grow_vertical = 0
-alignment = 1
 theme_override_constants/separation = 10
+alignment = 1
 
-[node name="PrintScout" type="Button" parent="UI/Control/Fabricator"]
+[node name="PrintScout" type="Button" parent="UI/Control/Fabricator" unique_id=167618972]
 layout_mode = 2
 text = "Scout"
 
-[node name="PrintMiner" type="Button" parent="UI/Control/Fabricator"]
+[node name="PrintMiner" type="Button" parent="UI/Control/Fabricator" unique_id=1364188596]
 layout_mode = 2
 text = "Miner"
 
-[node name="PrintDefender" type="Button" parent="UI/Control/Fabricator"]
+[node name="PrintDefender" type="Button" parent="UI/Control/Fabricator" unique_id=1475435023]
 layout_mode = 2
 text = "Defender"
 
-[node name="GameOverLayer" type="CanvasLayer" parent="."]
+[node name="GameOverLayer" type="CanvasLayer" parent="." unique_id=265312354]
 visible = false
 
-[node name="ColorRect" type="ColorRect" parent="GameOverLayer"]
+[node name="ColorRect" type="ColorRect" parent="GameOverLayer" unique_id=1330060468]
 anchors_preset = 15
 anchor_right = 1.0
 anchor_bottom = 1.0
@@ -325,35 +379,35 @@ grow_horizontal = 2
 grow_vertical = 2
 color = Color(0, 0, 0, 0.705882)
 
-[node name="CenterContainer" type="CenterContainer" parent="GameOverLayer"]
+[node name="CenterContainer" type="CenterContainer" parent="GameOverLayer" unique_id=549700881]
 anchors_preset = 15
 anchor_right = 1.0
 anchor_bottom = 1.0
 grow_horizontal = 2
 grow_vertical = 2
 
-[node name="PanelContainer" type="PanelContainer" parent="GameOverLayer/CenterContainer"]
+[node name="PanelContainer" type="PanelContainer" parent="GameOverLayer/CenterContainer" unique_id=1360838086]
 custom_minimum_size = Vector2(300, 200)
 layout_mode = 2
 
-[node name="VBox" type="VBoxContainer" parent="GameOverLayer/CenterContainer/PanelContainer"]
+[node name="VBox" type="VBoxContainer" parent="GameOverLayer/CenterContainer/PanelContainer" unique_id=1757773891]
 layout_mode = 2
 theme_override_constants/separation = 20
 alignment = 1
 
-[node name="Label" type="Label" parent="GameOverLayer/CenterContainer/PanelContainer/VBox"]
+[node name="Label" type="Label" parent="GameOverLayer/CenterContainer/PanelContainer/VBox" unique_id=837179294]
 layout_mode = 2
 theme_override_colors/font_color = Color(1, 0, 0, 1)
 theme_override_font_sizes/font_size = 32
 text = "MISSION FEHLGESCHLAGEN"
 horizontal_alignment = 1
 
-[node name="Reason" type="Label" parent="GameOverLayer/CenterContainer/PanelContainer/VBox"]
+[node name="Reason" type="Label" parent="GameOverLayer/CenterContainer/PanelContainer/VBox" unique_id=1867968491]
 layout_mode = 2
 text = "Das Mutterschiff wurde zerstört."
 horizontal_alignment = 1
 
-[node name="RestartButton" type="Button" parent="GameOverLayer/CenterContainer/PanelContainer/VBox"]
+[node name="RestartButton" type="Button" parent="GameOverLayer/CenterContainer/PanelContainer/VBox" unique_id=462821325]
 custom_minimum_size = Vector2(120, 40)
 layout_mode = 2
 size_flags_horizontal = 4

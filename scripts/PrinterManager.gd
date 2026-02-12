@@ -49,8 +49,8 @@ func add_job(drone: Dictionary) -> Dictionary:
 	for res in drone.cost:
 		Global.resources[res] -= drone.cost[res]
 	
-	# Tier 1 drones take 2 turns (placeholder logic)
-	slots[free_slot] = Job.new(drone.id, drone.name, 2)
+	# Use build_time from data or default to 2
+	slots[free_slot] = Job.new(drone.id, drone.name, drone.get("build_time", 2))
 	emit_signal("printer_updated")
 	print("Started printing ", drone.name, " in slot ", free_slot)
 	return {"success": true, "message": "STARTED PRINTING: " + drone.name.to_upper()}
