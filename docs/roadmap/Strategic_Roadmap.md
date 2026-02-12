@@ -1,179 +1,164 @@
-# Project Guppi -- Strategic Roadmap
+# Project Guppi — Strategic Roadmap
 
-## 1. Core Turn Structure (Condensed & Clear)
+> Status: Active Development  
+> Last Updated: 2026-02-12  
+> Current Focus: Encounter Combat & Sector Progression
 
-To avoid phase overload, the turn system is streamlined into **four
-major phases**:
+---
 
-### Turn Flow
+# 1. Core Turn Structure (Implemented)
 
-1.  **Command Phase**
-    -   Movement (Jump)
-    -   Scanning
-    -   Assigning units
-    -   Building units
-    -   Upgrades
-2.  **Execution Phase**
-    -   Production completes
-    -   Resources are collected
-    -   Automated processes resolve
-3.  **Conflict Phase**
-    -   Combat resolution
-    -   Battle log feedback
-    -   Unit losses & damage application
-4.  **Resolution Phase**
-    -   Random events
-    -   XP gain
-    -   Level check
-    -   Unlock notifications
+The turn system is streamlined into four major phases:
 
-This keeps the system readable while preserving structure.
+## Turn Flow
 
-------------------------------------------------------------------------
+1. Command Phase
+   - Jump
+   - Scan
+   - Assign miners
+   - Build drones
+   - Upgrades (planned)
 
-## 2. Progression System Rework
+2. Execution Phase
+   - Fabrication progress
+   - Automated processes
 
-Leveling must feel impactful.
+3. Conflict Phase
+   - Encounter-based combat (modal overlay)
+   - Fight or Flee decision
+   - Damage persistence
+   - Unit losses
+   - XP gain
 
-### Level Up Effects
+4. Resolution Phase
+   - Energy regeneration
+   - Mining resolution
+   - Random events (planned)
+   - Level check
 
--   Ship module expansion (visual & mechanical)
--   New unit types unlocked
--   New production modules unlocked
--   Passive bonuses (energy regen, mining efficiency, defense bonus)
+---
 
-### Visual Ship Evolution
+# 2. Combat System (Implemented v1)
 
-Each level unlock allows upgrading one module: - Weapon systems
-(railgun, missile battery, beam cannon) - Engine module (jump range /
-efficiency) - Shield array (damage mitigation) - Hull reinforcement (max
-HP) - EMP module (combat utility)
+## Features
 
-Upgrades should be visually represented on the mothership model.
+- Persistent enemy HP
+- Fleet HP tracking per drone
+- Mothership hull damage spillover
+- Fight (1 round)
+- Flee (33% chance)
+- Battle report overlay
+- UI lock during encounter
+- Enemy remains if flee succeeds
 
-------------------------------------------------------------------------
+## Next Iteration
 
-## 3. Enemy Design Philosophy
+- Initiative system
+- Shield vs Armor separation
+- Damage types (Kinetic / Energy / EMP)
+- Targeting priorities
+- Enemy abilities
 
-Instead of simple level scaling:
+---
 
-### Sector-Based Difficulty
+# 3. Progression System
 
--   Galaxy divided into sectors
--   Each sector introduces stronger enemy archetypes
--   Player feels stronger when returning to earlier sectors
+## Implemented
 
-### Enemy Evolution
+- XP gain from combat & scanning
+- Level tracking
+- HP scaling support
 
-New enemy classes instead of pure stat scaling: - Swarm (numbers) -
-Corsair (burst damage) - Fortress (heavy defense) - Carrier (spawns
-drones) - Tech Faction (EMP, hacking)
+## Planned
 
-Progression must feel empowering --- not offset by artificial scaling.
+- Ship module upgrades
+- Visual model expansion
+- Unlockable unit types
+- Passive bonuses per level
 
-------------------------------------------------------------------------
+---
 
-## 4. Faction & Diplomacy System
+# 4. Sector-Based Difficulty (Planned)
 
-Introduce multiple factions with distinct traits:
+Galaxy divided into sectors:
 
-### Example Factions
+- Sector 1: Swarm & Corsair
+- Sector 2: Fortress units
+- Sector 3+: Carrier & Tech Faction
 
--   Militaristic Dominion (aggressive, strong fleets)
--   Trade Consortium (economic power, trade bonuses)
--   Technocratic Union (advanced tech, EMP units)
--   Nomad Clans (high mobility, hit-and-run)
+Goal:
+Return to earlier sectors → feel powerful.
 
-### Diplomacy Features
+---
 
--   Trade agreements
--   Ceasefire
--   Alliance
--   Espionage
--   Reputation system
+# 5. Faction & Diplomacy (Planned)
 
-Diplomacy creates alternative win paths beyond conquest.
+Future systems:
 
-------------------------------------------------------------------------
+- Reputation score
+- Trade agreements
+- Alliance & ceasefire
+- Faction traits
+- Diplomatic victory path
 
-## 5. Economy & Production Depth
+---
 
-Resource roles clarified:
+# 6. Economy
 
--   Iron (FE): Base construction
--   Titanium (TI): Structural upgrades & modules
--   Uranium (U): Advanced tech & energy systems
--   Data: Research & events
+## Resources
 
-### Production Improvements
+- Iron (FE) — Base construction
+- Titanium (TI) — Structural upgrades
+- Uranium (U) — Advanced systems
+- Data — Research & events
 
--   Different build times per unit
--   Production queue slots
--   Permanent fabrication upgrades via Titanium
+## Implemented
 
-------------------------------------------------------------------------
+- Mining drones
+- Resource extraction per turn
+- Fabrication slots
 
-## 6. Event System Expansion
+## Planned
 
-Random events occur in Resolution Phase:
+- Fabricator upgrades
+- Research system
+- Sector economy modifiers
 
--   Distress signal
--   Abandoned wreck
--   Rogue AI
--   Trade opportunity
--   Sector anomaly
+---
 
-Each event includes: - Risk vs reward decision - Resource impact -
-Reputation impact
+# 7. Event System (Planned)
 
-------------------------------------------------------------------------
+Resolution Phase events:
 
-## 7. Planetary Development (Mid-Term Expansion)
+- Distress signal
+- Rogue AI
+- Trade opportunity
+- Wreck salvage
+- Sector anomaly
 
-Optional deeper layer:
+Each includes:
+- Risk vs reward
+- Reputation impact
+- Resource impact
 
--   Mining Hub
--   Research Lab
--   Defense Grid
--   Trade Port
+---
 
-Buildings affect: - Resource yield - Defense - Event probability -
-Diplomacy leverage
+# 8. Long-Term Vision
 
-------------------------------------------------------------------------
+- Technology tree
+- Multiple mothership instances (cloning mechanic)
+- Save / Load system
+- Debug overlay
+- Steam-ready build polish
 
-## 8. Combat System Upgrade Path
-
-Enhance tactical clarity without overcomplexity:
-
--   Initiative system
--   Damage types (kinetic, energy, EMP)
--   Armor & shield separation
--   Target priority options
--   Clear battle report
-
-------------------------------------------------------------------------
-
-## 9. Long-Term Vision
-
--   Technology tree
--   Multiple mothership instances (cloning mechanic)
--   Save / Load system
--   Modular architecture (TurnManager, CombatManager, EventManager,
-    EconomyManager)
--   Steam-ready build polish
-
-------------------------------------------------------------------------
+---
 
 # Strategic Direction
 
-Project Guppi evolves from a Proof of Concept into:
+Project Guppi evolves into:
 
--   A sector-based strategic expansion game
--   With meaningful progression
--   Faction-driven politics
--   Visual ship evolution
--   Tactical but readable combat
--   Modular scalable architecture
-
-The goal is clarity, depth, and long-term replayability.
+- Sector-based strategic expansion game
+- With meaningful progression
+- Persistent tactical combat
+- Modular architecture
+- Long-term replayability
