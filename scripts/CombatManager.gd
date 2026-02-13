@@ -1,6 +1,6 @@
 extends Node
 # CombatManager.gd (Godot 4.x strict-parse safe)
-# Encounter combat with readable battle log: "who hits whom for how much".
+# Combat with aggregated stacks + segmented HP bars + working battle log.
 
 signal encounter_started(payload: Dictionary)
 signal encounter_updated(payload: Dictionary)
@@ -10,7 +10,7 @@ signal encounter_ended(payload: Dictionary)
 signal combat_occurred(results)
 
 const FLEE_CHANCE: float = 0.3333
-const BAR_WIDTH: int = 22
+const BAR_WIDTH: int = 26  # visual width for large HP (mothership/enemies with big durability)
 
 var _rng: RandomNumberGenerator = RandomNumberGenerator.new()
 
@@ -20,9 +20,13 @@ var _turn_in_encounter: int = 0
 var _player_inventory_ref: Dictionary = {}
 var _system_enemy_ref: Array = []
 
-var _enemy_units: Array = []     # Array[Dictionary] each enemy has hp/max_hp
-var _player_stacks: Array = []   # Array[Dictionary] stack has unit_hp array
-var _log_buffer: Array = []      # Array[String] bbcode lines
+# Aggregated stacks
+# stack: { id, name, count, max_hp, firepower, unit_hp:Array[int] }  unit_hp[0] is the "front" unit
+var _player_stacks: Array = []
+var _enemy_stacks: Array = []
+
+# BBCode log lines
+var _log_buffer: Array = []
 
 func _ready() -> void:
 	_rng.randomize()
@@ -36,6 +40,10 @@ func get_log_bb() -> String:
 	var start: int = max(0, _log_buffer.size() - max_lines)
 	var lines: Array = _log_buffer.slice(start, _log_buffer.size())
 	return "\n".join(lines)
+
+# -------------------------
+# Encounter lifecycle
+# -------------------------
 
 func begin_encounter(system: Variant, player_inventory: Dictionary) -> void:
 	if _active:
@@ -53,22 +61,12 @@ func begin_encounter(system: Variant, player_inventory: Dictionary) -> void:
 	_player_inventory_ref = player_inventory
 	_system_enemy_ref = sys["enemies"] as Array
 
-	_enemy_units.clear()
 	_player_stacks.clear()
+	_enemy_stacks.clear()
 	_log_buffer.clear()
 
-	for e in _system_enemy_ref:
-		if typeof(e) != TYPE_DICTIONARY:
-			continue
-		var e_dict: Dictionary = e as Dictionary
-		var max_hp: int = _safe_stat_from_dict(e_dict, "durability", 10)
-
-		var inst: Dictionary = e_dict.duplicate(true)
-		inst["max_hp"] = max_hp
-		inst["hp"] = max_hp
-		_enemy_units.append(inst)
-
 	_player_stacks = _build_player_stacks_from_inventory(_player_inventory_ref)
+	_enemy_stacks = _build_enemy_stacks_from_system(_system_enemy_ref)
 
 	_active = true
 	_turn_in_encounter = 0
@@ -85,13 +83,13 @@ func player_fight_round() -> void:
 
 	_player_attack_phase()
 
-	if _enemy_units.size() == 0:
+	if _count_total_enemy_units() <= 0:
 		_end_victory()
 		return
 
-	_enemy_attack_phase()
+	_enemy_attack_phase(false)
 
-	if Global.mothership_hp <= 0:
+	if int(Global.mothership_hp) <= 0:
 		_end_defeat("HÜLLE ZERSTÖRT")
 		return
 
@@ -114,14 +112,14 @@ func player_try_flee() -> void:
 	_log_line("[color=red][b]Flucht gescheitert![/b][/color] Die Gegner erhalten einen freien Angriff.")
 	_enemy_attack_phase(true)
 
-	if Global.mothership_hp <= 0:
+	if int(Global.mothership_hp) <= 0:
 		_end_defeat("HÜLLE ZERSTÖRT")
 		return
 
 	_emit_update("FLEE FAILED")
 
 # -------------------------
-# Phases with detailed log
+# Phases
 # -------------------------
 
 func _player_attack_phase() -> void:
@@ -141,71 +139,77 @@ func _player_attack_phase() -> void:
 
 		any_fire = true
 
+		# ✅ all living units of that type shoot
 		var base: int = fp * cnt
 		var dmg: int = int(float(base) * _rng.randf_range(0.85, 1.15))
 		dmg = max(0, dmg)
 
-		if _enemy_units.size() <= 0:
+		if _count_total_enemy_units() <= 0:
 			break
 
-		var target_idx: int = 0
-		var target: Dictionary = _enemy_units[target_idx] as Dictionary
+		var target_idx: int = _pick_enemy_stack_target_index()
+		if target_idx == -1:
+			break
+
+		var target: Dictionary = _enemy_stacks[target_idx] as Dictionary
 		var t_name: String = str(target.get("name", "Enemy"))
+		var attacker_name: String = str(stack.get("name","Unit"))
 
 		_log_line("[color=cyan]%s x%d[/color] feuert auf [color=red]%s[/color] für [b]%d[/b] DMG"
-			% [str(stack.get("name","Unit")), cnt, t_name, dmg])
+			% [attacker_name, cnt, t_name, dmg])
 
-		_apply_damage_to_enemy_index(target_idx, dmg)
+		_apply_damage_to_stack(target, dmg, true)
 
 	if not any_fire:
 		_log_line("[color=gray]Deine Flotte hat keine Feuerkraft.[/color]")
 
-func _enemy_attack_phase(free_attack: bool = false) -> void:
-	if _enemy_units.size() <= 0:
+	_sync_inventory_from_stacks()
+
+func _enemy_attack_phase(free_attack: bool) -> void:
+	if _count_total_enemy_units() <= 0:
 		return
 
 	var total_player_units: int = _count_total_player_units()
 
-	for ev in _enemy_units:
+	for ev in _enemy_stacks:
 		if typeof(ev) != TYPE_DICTIONARY:
 			continue
-		var enemy: Dictionary = ev as Dictionary
-		var ehp: int = int(enemy.get("hp", 0))
-		if ehp <= 0:
+
+		var enemy_stack: Dictionary = ev as Dictionary
+		var cnt: int = _count_alive_in_stack(enemy_stack)
+		if cnt <= 0:
 			continue
 
-		var e_name: String = str(enemy.get("name", "Enemy"))
-		var e_fp: int = _safe_stat_from_dict(enemy, "firepower", 1)
+		var e_name: String = str(enemy_stack.get("name", "Enemy"))
+		var e_fp: int = int(enemy_stack.get("firepower", 1))
 
-		var dmg: int = int(float(e_fp) * _rng.randf_range(0.85, 1.15))
+		# ✅ all living enemies in this stack shoot
+		var base: int = e_fp * cnt
+		var dmg: int = int(float(base) * _rng.randf_range(0.85, 1.15))
 		dmg = max(1, dmg)
 
 		if total_player_units <= 0:
 			var hull_dmg: int = int(dmg * (3.0 if free_attack else 2.0))
-			_log_line("[color=red]%s[/color] trifft [color=orange]HÜLLE[/color] für [b]%d[/b] DMG" % [e_name, hull_dmg])
-			Global.mothership_hp -= hull_dmg
-			if Global.mothership_hp < 0:
-				Global.mothership_hp = 0
-			if Global.mothership_hp <= 0:
+			_log_line("[color=red]%s x%d[/color] trifft [color=orange]HÜLLE[/color] für [b]%d[/b] DMG" % [e_name, cnt, hull_dmg])
+			_apply_damage_to_mothership(hull_dmg)
+			if int(Global.mothership_hp) <= 0:
 				return
 			continue
 
 		var t_stack_idx: int = _pick_player_stack_target_index()
 		if t_stack_idx == -1:
 			var hull_dmg2: int = int(dmg * 2.0)
-			_log_line("[color=red]%s[/color] trifft [color=orange]HÜLLE[/color] für [b]%d[/b] DMG" % [e_name, hull_dmg2])
-			Global.mothership_hp -= hull_dmg2
-			if Global.mothership_hp < 0:
-				Global.mothership_hp = 0
-			if Global.mothership_hp <= 0:
+			_log_line("[color=red]%s x%d[/color] trifft [color=orange]HÜLLE[/color] für [b]%d[/b] DMG" % [e_name, cnt, hull_dmg2])
+			_apply_damage_to_mothership(hull_dmg2)
+			if int(Global.mothership_hp) <= 0:
 				return
 			continue
 
 		var t_stack: Dictionary = _player_stacks[t_stack_idx] as Dictionary
 		var t_name: String = str(t_stack.get("name", "Unit"))
 
-		_log_line("[color=red]%s[/color] schießt auf [color=cyan]%s[/color] für [b]%d[/b] DMG" % [e_name, t_name, dmg])
-		_apply_damage_to_stack(t_stack, dmg)
+		_log_line("[color=red]%s x%d[/color] schießt auf [color=cyan]%s[/color] für [b]%d[/b] DMG" % [e_name, cnt, t_name, dmg])
+		_apply_damage_to_stack(t_stack, dmg, false)
 
 		_sync_inventory_from_stacks()
 		total_player_units = _count_total_player_units()
@@ -213,28 +217,10 @@ func _enemy_attack_phase(free_attack: bool = false) -> void:
 			_log_line("[color=orange]Alle Drohnen zerstört![/color] Ab jetzt geht Schaden auf die Hülle.")
 
 # -------------------------
-# Damage helpers
+# Damage + carry-over
 # -------------------------
 
-func _apply_damage_to_enemy_index(idx: int, dmg: int) -> void:
-	if idx < 0 or idx >= _enemy_units.size():
-		return
-	var enemy: Dictionary = _enemy_units[idx] as Dictionary
-	var hp: int = int(enemy.get("hp", 0))
-	var max_hp: int = int(enemy.get("max_hp", _safe_stat_from_dict(enemy, "durability", 10)))
-
-	var take: int = min(dmg, hp)
-	hp -= take
-	enemy["hp"] = hp
-
-	_log_line("→ [color=red]%s[/color] nimmt %d DMG (HP %d/%d)" % [str(enemy.get("name","Enemy")), take, hp, max_hp])
-
-	if hp <= 0:
-		var dead_name: String = str(enemy.get("name","Enemy"))
-		_enemy_units.remove_at(idx)
-		_log_line("[color=green]✖ %s zerstört[/color]" % dead_name)
-
-func _apply_damage_to_stack(stack: Dictionary, dmg: int) -> void:
+func _apply_damage_to_stack(stack: Dictionary, dmg: int, target_is_enemy: bool) -> void:
 	var remaining: int = dmg
 	var name_txt: String = str(stack.get("name", "Unit"))
 	var max_hp: int = int(stack.get("max_hp", 1))
@@ -244,6 +230,7 @@ func _apply_damage_to_stack(stack: Dictionary, dmg: int) -> void:
 
 	var unit_hp: Array = stack["unit_hp"] as Array
 
+	# ✅ carry over: always hits the "front" unit first
 	while remaining > 0 and unit_hp.size() > 0:
 		var current_hp: int = int(unit_hp[0])
 		var take: int = min(remaining, current_hp)
@@ -253,15 +240,26 @@ func _apply_damage_to_stack(stack: Dictionary, dmg: int) -> void:
 		if current_hp <= 0:
 			unit_hp.remove_at(0)
 			stack["count"] = unit_hp.size()
-			_log_line("→ [color=cyan]%s[/color] verliert 1 Einheit! (Rest: x%d)" % [name_txt, int(stack["count"])])
+			_log_line("→ %s verliert 1 Einheit! (Rest: x%d)" % [
+				("[color=red]%s[/color]" % name_txt) if target_is_enemy else ("[color=cyan]%s[/color]" % name_txt),
+				int(stack["count"])
+			])
 		else:
 			unit_hp[0] = current_hp
-			_log_line("→ [color=cyan]%s[/color] vorderste Einheit HP %d/%d" % [name_txt, current_hp, max_hp])
+			_log_line("→ %s vorderste Einheit HP %d/%d" % [
+				("[color=red]%s[/color]" % name_txt) if target_is_enemy else ("[color=cyan]%s[/color]" % name_txt),
+				current_hp, max_hp
+			])
 
 	stack["unit_hp"] = unit_hp
 
+func _apply_damage_to_mothership(dmg: int) -> void:
+	Global.mothership_hp = int(Global.mothership_hp) - int(dmg)
+	if int(Global.mothership_hp) < 0:
+		Global.mothership_hp = 0
+
 # -------------------------
-# Build stacks / stats
+# Build stacks
 # -------------------------
 
 func _build_player_stacks_from_inventory(inv: Dictionary) -> Array:
@@ -300,6 +298,45 @@ func _build_player_stacks_from_inventory(inv: Dictionary) -> Array:
 
 	return stacks
 
+func _build_enemy_stacks_from_system(enemies: Array) -> Array:
+	var stacks: Array = []
+	var by_id: Dictionary = {} # id -> stack dict
+
+	for ev in enemies:
+		if typeof(ev) != TYPE_DICTIONARY:
+			continue
+		var e: Dictionary = ev as Dictionary
+		var id: String = str(e.get("id", e.get("name", "enemy")))
+		var name_txt: String = str(e.get("name", id))
+		var max_hp: int = _safe_stat_from_dict(e, "durability", 10)
+		var fp: int = _safe_stat_from_dict(e, "firepower", 1)
+
+		if not by_id.has(id):
+			by_id[id] = {
+				"id": id,
+				"name": name_txt,
+				"count": 0,
+				"max_hp": max_hp,
+				"firepower": fp,
+				"unit_hp": []
+			}
+
+		var st: Dictionary = by_id[id] as Dictionary
+		(st["unit_hp"] as Array).append(max_hp)
+		st["count"] = int(st["count"]) + 1
+
+	for k in by_id.keys():
+		stacks.append(by_id[k])
+
+	# stable order: tougher first (optional)
+	stacks.sort_custom(func(a: Variant, b: Variant) -> bool:
+		var da: int = int((a as Dictionary).get("max_hp", 0))
+		var db: int = int((b as Dictionary).get("max_hp", 0))
+		return da > db
+	)
+
+	return stacks
+
 func _safe_stat_from_dict(obj: Dictionary, key: String, fallback: int) -> int:
 	if obj.has("stats") and typeof(obj["stats"]) == TYPE_DICTIONARY:
 		var stats: Dictionary = obj["stats"] as Dictionary
@@ -324,12 +361,22 @@ func _sync_inventory_from_stacks() -> void:
 		if id2 != "":
 			_player_inventory_ref[id2] = cnt
 
+# -------------------------
+# Target selection
+# -------------------------
+
 func _pick_player_stack_target_index() -> int:
+	return _pick_stack_weighted(_player_stacks)
+
+func _pick_enemy_stack_target_index() -> int:
+	return _pick_stack_weighted(_enemy_stacks)
+
+func _pick_stack_weighted(stacks: Array) -> int:
 	var weights: Array = []
 	var total: int = 0
 
-	for i in range(_player_stacks.size()):
-		var sv: Variant = _player_stacks[i]
+	for i in range(stacks.size()):
+		var sv: Variant = stacks[i]
 		if typeof(sv) != TYPE_DICTIONARY:
 			weights.append(0)
 			continue
@@ -351,7 +398,7 @@ func _pick_player_stack_target_index() -> int:
 	return -1
 
 # -------------------------
-# Rendering
+# Rendering payload
 # -------------------------
 
 func _emit_update(header: String) -> void:
@@ -376,7 +423,13 @@ func _build_status_bb(header: String) -> String:
 
 func _build_fleet_bb() -> String:
 	var bb: String = ""
-	bb += "[b]DEINE FLOTTE[/b]\n\n"
+	bb += "[b]FLOTTE[/b]\n\n"
+
+	# ✅ Mothership bar in combat
+	bb += "[color=orange]Mutterschiff[/color]\n"
+	bb += _render_segment_bar(int(Global.mothership_hp), int(Global.max_mothership_hp)) + "\n\n"
+
+	var any_units: bool = false
 
 	for sv in _player_stacks:
 		if typeof(sv) != TYPE_DICTIONARY:
@@ -386,19 +439,21 @@ func _build_fleet_bb() -> String:
 		if cnt <= 0:
 			continue
 
+		any_units = true
+
 		var max_hp: int = int(stack.get("max_hp", 1))
 		var fp: int = int(stack.get("firepower", 0))
 		var dmg_total: int = fp * cnt
 
-		var unit_hp: Array = []
-		if stack.has("unit_hp") and typeof(stack["unit_hp"]) == TYPE_ARRAY:
-			unit_hp = stack["unit_hp"] as Array
+		# front unit HP
+		var unit_hp: Array = (stack["unit_hp"] as Array) if stack.has("unit_hp") and typeof(stack["unit_hp"]) == TYPE_ARRAY else []
+		var front_hp: int = int(unit_hp[0]) if unit_hp.size() > 0 else 0
 
-		bb += "%s  [color=white]x%d[/color]  [color=cyan]DMG %d[/color]\n" % [str(stack.get("name", "Unit")), cnt, dmg_total]
-		bb += _render_unit_bars(unit_hp, max_hp) + "\n\n"
+		bb += "%s  [color=white]%dx[/color]  [color=cyan]DMG %d[/color]\n" % [str(stack.get("name", "Unit")), cnt, dmg_total]
+		bb += _render_segment_bar(front_hp, max_hp) + "\n\n"
 
-	if _count_total_player_units() <= 0:
-		bb += "[color=orange]Keine Drohnen aktiv.[/color]\n"
+	if not any_units:
+		bb += "[color=gray]Keine Drohnen aktiv.[/color]\n"
 
 	return bb
 
@@ -406,64 +461,70 @@ func _build_enemy_bb() -> String:
 	var bb: String = ""
 	bb += "[b]GEGNER[/b]\n\n"
 
-	for ev in _enemy_units:
+	if _count_total_enemy_units() <= 0:
+		bb += "[color=green]Keine Gegner mehr.[/color]\n"
+		return bb
+
+	for ev in _enemy_stacks:
 		if typeof(ev) != TYPE_DICTIONARY:
 			continue
-		var enemy: Dictionary = ev as Dictionary
-		var name_txt: String = str(enemy.get("name", "Enemy"))
-		var hp: int = int(enemy.get("hp", 0))
-		var max_hp: int = int(enemy.get("max_hp", _safe_stat_from_dict(enemy, "durability", 10)))
-		var fp: int = _safe_stat_from_dict(enemy, "firepower", 1)
+		var stack: Dictionary = ev as Dictionary
+		var cnt: int = int(stack.get("count", 0))
+		if cnt <= 0:
+			continue
 
-		bb += "%s  [color=red]DMG %d[/color]\n" % [name_txt, fp]
-		bb += _render_bar_inline(hp, max_hp) + "\n\n"
+		var max_hp: int = int(stack.get("max_hp", 1))
+		var fp: int = int(stack.get("firepower", 1))
+		var dmg_total: int = fp * cnt
 
-	if _enemy_units.size() == 0:
-		bb += "[color=green]Keine Gegner mehr.[/color]\n"
+		var unit_hp: Array = (stack["unit_hp"] as Array) if stack.has("unit_hp") and typeof(stack["unit_hp"]) == TYPE_ARRAY else []
+		var front_hp: int = int(unit_hp[0]) if unit_hp.size() > 0 else 0
+
+		bb += "%s  [color=white]%dx[/color]  [color=red]DMG %d[/color]\n" % [str(stack.get("name","Enemy")), cnt, dmg_total]
+		bb += _render_segment_bar(front_hp, max_hp) + "\n\n"
 
 	return bb
 
-func _render_unit_bars(unit_hp: Array, max_hp: int) -> String:
-	var out: String = ""
-	var line: String = ""
-	var per_line: int = 3
+# -------------------------
+# HP bar rendering (segments)
+# -------------------------
 
-	for i in range(unit_hp.size()):
-		var hp: int = int(unit_hp[i])
-		var one: String = _render_bar_inline(hp, max_hp)
-		line += one + "  "
-		if ((i + 1) % per_line) == 0:
-			out += line.strip_edges() + "\n"
-			line = ""
-
-	if line != "":
-		out += line.strip_edges()
-
-	return out
-
-func _render_bar_inline(hp: int, max_hp: int) -> String:
+func _render_segment_bar(hp: int, max_hp: int) -> String:
 	var mh: int = max(1, max_hp)
-	var cells: int = BAR_WIDTH
+	var h: int = clamp(hp, 0, mh)
 
+	# For small HP pools (drones etc): 1 segment == 1 HP
+	if mh <= BAR_WIDTH:
+		var filled: int = h
+		var empty: int = mh - h
+
+		var bar := ""
+		bar += "[color=gray][[/color]"
+		bar += "[color=lime]" + "█".repeat(filled) + "[/color]"
+		bar += "[color=gray]" + "·".repeat(empty) + "[/color]"
+		bar += "[color=gray]][/color] "
+		bar += "[color=white]%d/%d[/color]" % [h, mh]
+		return bar
+
+	# For huge pools (mothership, fortress): compress
+	var cells: int = BAR_WIDTH
 	var hp_per_cell: int = int(ceil(float(mh) / float(cells)))
 	hp_per_cell = max(1, hp_per_cell)
 
-	var filled_cells: int = int(ceil(float(max(0, hp)) / float(hp_per_cell)))
+	var filled_cells: int = int(ceil(float(h) / float(hp_per_cell)))
 	filled_cells = clamp(filled_cells, 0, cells)
+	var empty_cells: int = cells - filled_cells
 
-	var bar: String = ""
-	bar += "[color=gray]["
-	for i in range(cells):
-		if i < filled_cells:
-			bar += "[/color][color=lime]█[/color][color=gray]"
-		else:
-			bar += "·"
-	bar += "][/color] "
-	bar += "[color=white]%d/%d[/color]" % [hp, max_hp]
-	return bar
+	var bar2 := ""
+	bar2 += "[color=gray][[/color]"
+	bar2 += "[color=lime]" + "█".repeat(filled_cells) + "[/color]"
+	bar2 += "[color=gray]" + "·".repeat(empty_cells) + "[/color]"
+	bar2 += "[color=gray]][/color] "
+	bar2 += "[color=white]%d/%d[/color]" % [h, mh]
+	return bar2
 
 # -------------------------
-# Logging / endings
+# Endings + log
 # -------------------------
 
 func _log_line(text_bb: String) -> void:
@@ -536,15 +597,27 @@ func _end_defeat(reason: String) -> void:
 	}
 	emit_signal("combat_occurred", report)
 
+# -------------------------
+# Counters
+# -------------------------
+
 func _count_alive_in_stack(stack: Dictionary) -> int:
 	if not stack.has("unit_hp") or typeof(stack["unit_hp"]) != TYPE_ARRAY:
 		return 0
-	var unit_hp: Array = stack["unit_hp"] as Array
-	return unit_hp.size()
+	return (stack["unit_hp"] as Array).size()
 
 func _count_total_player_units() -> int:
 	var total: int = 0
 	for sv in _player_stacks:
+		if typeof(sv) != TYPE_DICTIONARY:
+			continue
+		var stack: Dictionary = sv as Dictionary
+		total += int(stack.get("count", 0))
+	return total
+
+func _count_total_enemy_units() -> int:
+	var total: int = 0
+	for sv in _enemy_stacks:
 		if typeof(sv) != TYPE_DICTIONARY:
 			continue
 		var stack: Dictionary = sv as Dictionary
