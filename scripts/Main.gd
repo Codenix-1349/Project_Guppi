@@ -48,6 +48,7 @@ extends Node
 @onready var _ui_fabricator: Control = $UI/Control/Fabricator
 @onready var _ui_info_panel: Control = $UI/Control/InfoPanel
 
+
 func _ready():
 	# Connect signals
 	turn_manager.phase_changed.connect(_on_phase_changed)
@@ -106,6 +107,7 @@ func _ready():
 	_on_phase_changed(turn_manager.current_phase)
 	update_ui()
 
+
 # ✅ Apply random start system coming from GalaxyMap3D
 func _apply_random_start_system_if_available() -> void:
 	if galaxy_map == null:
@@ -120,7 +122,9 @@ func _apply_random_start_system_if_available() -> void:
 		if mothership.has_method("set_current_system"):
 			mothership.set_current_system(start_idx)
 		else:
-			mothership.current_system_index = start_idx
+			# fallback: some mothership variants expose current_system_index
+			if "current_system_index" in mothership:
+				mothership.current_system_index = start_idx
 			if mothership.has_signal("system_changed"):
 				mothership.emit_signal("system_changed", start_idx)
 
@@ -129,6 +133,7 @@ func _apply_random_start_system_if_available() -> void:
 		galaxy_map.selected_system_index = -1
 		galaxy_map.selected_planet_index = -1
 		galaxy_map.update_selection_visuals()
+
 
 # ✅ start camera focus on mothership / current system
 func _focus_camera_on_start() -> void:
@@ -151,6 +156,7 @@ func _focus_camera_on_start() -> void:
 			var sys = galaxy_map.systems[cur]
 			if sys and ("position" in sys):
 				pivot.focus_on(sys.position)
+
 
 func _show_info(drone_id: String):
 	var drone = Global.get_drone_by_id(drone_id)
@@ -501,34 +507,6 @@ func _unhandled_input(event):
 	if has_node("GalaxyMap3D") and event is InputEventMouseButton and event.pressed and event.button_index == MOUSE_BUTTON_LEFT:
 		_process_3d_selection(event.position, event.double_click)
 
-# ✅ NEW: dynamic click radius (pixels) based on camera distance + FOV + mothership size
-func _mothership_click_radius_px(cam: Camera3D, ms_world_pos: Vector3) -> float:
-	if cam == null:
-		return 50.0
-
-	var viewport_h: float = float(get_viewport().get_visible_rect().size.y)
-	var dist: float = cam.global_position.distance_to(ms_world_pos)
-	dist = maxf(dist, 0.01)
-
-	# approximate object radius in world units
-	var r_world: float = 2.0
-	if galaxy_map and galaxy_map.has_method("get_mothership_click_radius_world"):
-		r_world = float(galaxy_map.get_mothership_click_radius_world())
-
-	# perspective projection: pixels_per_world_at_dist ≈ H / (2*tan(fov/2) * dist)
-	var fov_rad: float = deg_to_rad(cam.fov)
-	var denom: float = 2.0 * tan(fov_rad * 0.5) * dist
-	denom = maxf(denom, 0.0001)
-
-	var px_per_world: float = viewport_h / denom
-	var r_px: float = r_world * px_per_world
-
-	# clamp to keep UX stable
-	r_px = clamp(r_px, 28.0, 110.0)
-
-	# little UX bias: easier to click mothership
-	return r_px * 1.15
-
 func _process_3d_selection(mouse_pos, is_double_click = false):
 	var cam = get_node("CameraPivot/Camera3D")
 	if not cam:
@@ -538,14 +516,10 @@ func _process_3d_selection(mouse_pos, is_double_click = false):
 
 	# 1) Mothership
 	if galaxy_map.mothership_mesh:
-		var ms_pos: Vector3 = galaxy_map.mothership_mesh.global_position
-		if galaxy_map.has_method("get_mothership_click_world_pos"):
-			ms_pos = galaxy_map.get_mothership_click_world_pos()
-
+		var ms_pos = galaxy_map.mothership_mesh.global_position
 		var ms_screen = cam.unproject_position(ms_pos)
 		if not cam.is_position_behind(ms_pos):
-			var r_px: float = _mothership_click_radius_px(cam, ms_pos)
-			if mouse_pos.distance_to(ms_screen) < r_px:
+			if mouse_pos.distance_to(ms_screen) < 50.0:
 				galaxy_map.selected_system_index = -2
 				galaxy_map.update_selection_visuals()
 				update_ui()
@@ -633,6 +607,9 @@ var _battle_scroll: ScrollContainer
 var _battle_rich: RichTextLabel
 var _battle_toggle_btn: Button
 var _battle_collapsed: bool = true
+
+# ✅ Safe area so the battle log never covers the bottom action buttons
+const _BATTLELOG_SAFE_BOTTOM_PX := 96
 
 # track original UI visibility
 var _combat_mode_active: bool = false
@@ -817,7 +794,7 @@ func _setup_battle_log_ui():
 	_battle_panel.anchor_right = 1.0
 	_battle_panel.anchor_bottom = 1.0
 	_battle_panel.offset_right = -16
-	_battle_panel.offset_bottom = -16
+	_battle_panel.offset_bottom = -_BATTLELOG_SAFE_BOTTOM_PX  # ✅ NEVER cover bottom buttons
 
 	var bg := StyleBoxFlat.new()
 	bg.bg_color = Color(0.02, 0.02, 0.03, 0.78)
@@ -865,10 +842,10 @@ func _setup_battle_log_ui():
 
 	_battle_rich = RichTextLabel.new()
 	_battle_rich.bbcode_enabled = true
-	_battle_rich.scroll_active = false
-	_battle_rich.fit_content = false
+	_battle_rich.scroll_active = false            # ✅ ScrollContainer handles scrolling
+	_battle_rich.fit_content = true               # ✅ IMPORTANT: make content height real
 	_battle_rich.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	_battle_rich.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	_battle_rich.size_flags_vertical = Control.SIZE_SHRINK_BEGIN
 	_battle_rich.text = ""
 	_battle_scroll.add_child(_battle_rich)
 
@@ -889,6 +866,9 @@ func _apply_battle_log_layout() -> void:
 	if _battle_panel == null:
 		return
 
+	# keep safe bottom offset always
+	_battle_panel.offset_bottom = -_BATTLELOG_SAFE_BOTTOM_PX
+
 	if _battle_collapsed:
 		_battle_toggle_btn.text = "Show"
 		_battle_scroll.visible = false
@@ -899,8 +879,8 @@ func _apply_battle_log_layout() -> void:
 	else:
 		_battle_toggle_btn.text = "Hide"
 		_battle_scroll.visible = true
-		var w: float = 560
-		var h: float = 300
+		var w: float = 520   # ✅ slightly narrower so it collides less often
+		var h: float = 320
 		_battle_panel.custom_minimum_size = Vector2(w, h)
 		_battle_panel.offset_left = -w
 		_battle_panel.offset_top = -h
@@ -918,10 +898,33 @@ func _update_battle_log_text(payload: Dictionary) -> void:
 	elif combat_manager and combat_manager.has_method("get_log_bb"):
 		log_bb = str(combat_manager.get_log_bb())
 
+	# ✅ always set text (even collapsed) so opening shows full history
 	_battle_rich.text = log_bb
 
+	# ✅ force ScrollContainer to recognize correct content height
+	call_deferred("_battlelog_refresh_content_size")
+
+	# auto scroll to bottom when expanded
 	if not _battle_collapsed:
 		call_deferred("_scroll_battle_log_to_bottom")
+
+func _battlelog_refresh_content_size() -> void:
+	if _battle_rich == null or _battle_scroll == null:
+		return
+
+	# Wait one frame so RichText computes layout
+	await get_tree().process_frame
+
+	var h: float = 0.0
+	if _battle_rich.has_method("get_content_height"):
+		h = float(_battle_rich.get_content_height())
+	else:
+		# fallback: try minimum size (less accurate but better than nothing)
+		h = float(_battle_rich.get_minimum_size().y)
+
+	# give ScrollContainer a real content height
+	if h > 0.0:
+		_battle_rich.custom_minimum_size = Vector2(0, h + 8)
 
 func _scroll_battle_log_to_bottom() -> void:
 	if _battle_scroll == null:
@@ -945,9 +948,13 @@ func _on_encounter_ui(payload: Dictionary):
 	_combat_fleet.text = str(payload.get("fleet_bb", ""))
 	_combat_enemy.text = str(payload.get("enemy_bb", ""))
 
+	# ✅ Battle log during combat
 	_set_battle_log_active(true)
+
+	# ✅ Auto-open once so you SEE it's working
 	_battle_collapsed = false
 	_apply_battle_log_layout()
+
 	_update_battle_log_text(payload)
 
 func _on_encounter_end(payload: Dictionary):
