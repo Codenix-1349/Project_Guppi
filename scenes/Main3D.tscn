@@ -10,6 +10,7 @@
 [ext_resource type="Script" uid="uid://c6a14an0f8w6s" path="res://scripts/GalaxyMap3D.gd" id="8_gm3d"]
 [ext_resource type="Script" uid="uid://bvqemm6fhux4o" path="res://scripts/CameraControl.gd" id="9_cam"]
 [ext_resource type="Script" uid="uid://bql3svy8g3tlj" path="res://scripts/ScoutManager.gd" id="10_sm"]
+[ext_resource type="Script" uid="uid://vbdhffe5kn8" path="res://audio/MusicPlaylist.gd" id="11_uki8y"]
 
 [sub_resource type="ProceduralSkyMaterial" id="ProceduralSkyMaterial_space"]
 sky_top_color = Color(0, 0, 0, 1)
@@ -412,5 +413,8 @@ custom_minimum_size = Vector2(120, 40)
 layout_mode = 2
 size_flags_horizontal = 4
 text = "NEUSTART"
+
+[node name="AudioStreamPlayer" type="AudioStreamPlayer" parent="." unique_id=2117421318]
+script = ExtResource("11_uki8y")
 
 [connection signal="pressed" from="GameOverLayer/CenterContainer/PanelContainer/VBox/RestartButton" to="." method="_on_restart_pressed"]
