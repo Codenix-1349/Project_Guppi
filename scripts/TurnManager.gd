@@ -14,7 +14,9 @@ func _ready():
 	print("Turn Manager initialized. Current Turn: ", turn_number)
 
 	if get_parent().has_node("CombatManager"):
-		get_parent().get_node("CombatManager").encounter_ended.connect(_on_encounter_ended)
+		var combat = get_parent().get_node("CombatManager")
+		if combat.has_signal("encounter_ended"):
+			combat.encounter_ended.connect(_on_encounter_ended)
 
 func next_phase():
 	match current_phase:
@@ -73,6 +75,11 @@ func _check_for_skirmish_and_pause() -> bool:
 	var managers = get_parent()
 	if not managers.has_node("Mothership"):
 		return false
+	if not managers.has_node("PrinterManager"):
+		return false
+	if not managers.has_node("CombatManager"):
+		return false
+
 	var ms = managers.get_node("Mothership")
 	var current_system_idx = ms.get_current_system()
 
@@ -89,10 +96,16 @@ func _check_for_skirmish_and_pause() -> bool:
 		return false
 
 	print("Enemy encounter in system ", system.name, "!")
+
 	var combat = managers.get_node("CombatManager")
 	var inv = managers.get_node("PrinterManager").inventory
-	combat.begin_encounter(system, inv)
-	return true
+
+	# ✅ New combat entrypoint (parse-safe, per-unit HP stacks)
+	if combat.has_method("begin_encounter"):
+		combat.begin_encounter(system, inv)
+		return true
+
+	return false
 
 func _on_encounter_ended(_payload: Dictionary) -> void:
 	_waiting_for_combat = false

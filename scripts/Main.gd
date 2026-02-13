@@ -94,8 +94,9 @@ func _ready():
 		galaxy_map.mothership_node = mothership
 		galaxy_map.generate_map_3d()
 
-	# ✅ Runtime combat UI (no new files)
+	# ✅ Runtime combat UI + runtime battle log (no new files)
 	_setup_combat_ui()
+	_setup_battle_log_ui()
 
 	_on_phase_changed(turn_manager.current_phase)
 	update_ui()
@@ -540,18 +541,25 @@ var _combat_fight_btn: Button
 var _combat_flee_btn: Button
 var _combat_close_btn: Button
 
+# ---------------------------
+# RUNTIME BATTLE LOG UI (combat-only, collapsible, never blocks buttons)
+# ---------------------------
+
+var _battle_panel: PanelContainer
+var _battle_scroll: ScrollContainer
+var _battle_rich: RichTextLabel
+var _battle_toggle_btn: Button
+var _battle_collapsed: bool = true
+
 # track original UI visibility
 var _combat_mode_active: bool = false
 var _saved_vis: Dictionary = {}
 
 func _set_combat_mode(active: bool) -> void:
-	# Avoid redundant toggles
 	if _combat_mode_active == active:
 		return
 	_combat_mode_active = active
 
-	# We hide only UI elements that make the text unreadable / cluttered
-	# and restore them after combat.
 	var nodes_to_toggle: Array = []
 
 	if system_panel: nodes_to_toggle.append(system_panel)
@@ -585,11 +593,8 @@ func _setup_combat_ui():
 	_combat_panel = PanelContainer.new()
 	_combat_panel.name = "CombatPanelRuntime"
 	_combat_panel.visible = false
-
-	# ✅ block clicks to UI behind it
 	_combat_panel.mouse_filter = Control.MOUSE_FILTER_STOP
 
-	# ✅ full-screen overlay-ish placement
 	_combat_panel.anchor_left = 0.0
 	_combat_panel.anchor_top = 0.0
 	_combat_panel.anchor_right = 1.0
@@ -599,9 +604,8 @@ func _setup_combat_ui():
 	_combat_panel.offset_right = -16
 	_combat_panel.offset_bottom = -16
 
-	# ✅ make background opaque enough so nothing shines through
 	var bg := StyleBoxFlat.new()
-	bg.bg_color = Color(0.05, 0.06, 0.08, 0.92) # dark + almost opaque
+	bg.bg_color = Color(0.05, 0.06, 0.08, 0.92)
 	bg.corner_radius_top_left = 10
 	bg.corner_radius_top_right = 10
 	bg.corner_radius_bottom_left = 10
@@ -700,6 +704,7 @@ func _setup_combat_ui():
 	_combat_close_btn.pressed.connect(func():
 		_combat_panel.visible = false
 		_set_combat_mode(false)
+		_set_battle_log_active(false) # ✅ hide log completely when combat closed
 	)
 
 	if combat_manager:
@@ -710,13 +715,142 @@ func _setup_combat_ui():
 		if combat_manager.has_signal("encounter_ended"):
 			combat_manager.encounter_ended.connect(_on_encounter_end)
 
+func _setup_battle_log_ui():
+	if not has_node("UI/Control"):
+		return
+	var ui_root: Control = $UI/Control
+
+	_battle_panel = PanelContainer.new()
+	_battle_panel.name = "BattleLogRuntime"
+	_battle_panel.visible = false
+	_battle_panel.mouse_filter = Control.MOUSE_FILTER_IGNORE # will be set when expanded
+	_battle_panel.z_index = 2000
+
+	# ✅ anchor bottom-right to never block action buttons (left)
+	_battle_panel.anchor_left = 1.0
+	_battle_panel.anchor_top = 1.0
+	_battle_panel.anchor_right = 1.0
+	_battle_panel.anchor_bottom = 1.0
+	_battle_panel.offset_right = -16
+	_battle_panel.offset_bottom = -16
+	# width/height will be handled by collapsed/expanded toggle
+
+	var bg := StyleBoxFlat.new()
+	bg.bg_color = Color(0.02, 0.02, 0.03, 0.78)
+	bg.corner_radius_top_left = 10
+	bg.corner_radius_top_right = 10
+	bg.corner_radius_bottom_left = 10
+	bg.corner_radius_bottom_right = 10
+	bg.content_margin_left = 8
+	bg.content_margin_right = 8
+	bg.content_margin_top = 8
+	bg.content_margin_bottom = 8
+	_battle_panel.add_theme_stylebox_override("panel", bg)
+
+	ui_root.add_child(_battle_panel)
+
+	var root_v := VBoxContainer.new()
+	_battle_panel.add_child(root_v)
+
+	# Header row
+	var header := HBoxContainer.new()
+	root_v.add_child(header)
+
+	var title := Label.new()
+	title.text = "BATTLE LOG"
+	title.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	header.add_child(title)
+
+	_battle_toggle_btn = Button.new()
+	_battle_toggle_btn.text = "Show"
+	header.add_child(_battle_toggle_btn)
+
+	_battle_toggle_btn.pressed.connect(func():
+		_battle_collapsed = !_battle_collapsed
+		_apply_battle_log_layout()
+	)
+
+	_battle_scroll = ScrollContainer.new()
+	_battle_scroll.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	_battle_scroll.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	root_v.add_child(_battle_scroll)
+
+	_battle_rich = RichTextLabel.new()
+	_battle_rich.bbcode_enabled = true
+	_battle_rich.scroll_active = false
+	_battle_rich.fit_content = true
+	_battle_rich.text = ""
+	_battle_scroll.add_child(_battle_rich)
+
+	_battle_collapsed = true
+	_apply_battle_log_layout()
+
+func _set_battle_log_active(active: bool) -> void:
+	if _battle_panel == null:
+		return
+	_battle_panel.visible = active
+	if not active:
+		_battle_panel.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		_battle_rich.text = ""
+		_battle_collapsed = true
+		_apply_battle_log_layout()
+
+func _apply_battle_log_layout() -> void:
+	if _battle_panel == null:
+		return
+
+	if _battle_collapsed:
+		_battle_toggle_btn.text = "Show"
+		_battle_scroll.visible = false
+
+		# ✅ Only show header row (no empty body)
+		_battle_panel.custom_minimum_size = Vector2(170, 0)
+
+		# Keep it tight at bottom-right
+		_battle_panel.offset_left = -170
+		_battle_panel.offset_top = -44
+
+		# ✅ Do not block clicks except the tiny header/button area
+		_battle_panel.mouse_filter = Control.MOUSE_FILTER_STOP
+	else:
+		_battle_toggle_btn.text = "Hide"
+		_battle_scroll.visible = true
+
+		# Expanded box
+		var w: float = 520
+		var h: float = 260
+		_battle_panel.custom_minimum_size = Vector2(w, h)
+		_battle_panel.offset_left = -w
+		_battle_panel.offset_top = -h
+
+		# ✅ When expanded we intentionally capture clicks inside panel only
+		_battle_panel.mouse_filter = Control.MOUSE_FILTER_STOP
+
+func _update_battle_log_text(payload: Dictionary) -> void:
+	if _battle_panel == null:
+		return
+	if not _battle_panel.visible:
+		return
+
+	# Prefer payload log_bb if present; else ask manager (if method exists)
+	var log_bb: String = ""
+	if payload.has("log_bb"):
+		log_bb = str(payload["log_bb"])
+	elif combat_manager and combat_manager.has_method("get_log_bb"):
+		log_bb = str(combat_manager.get_log_bb())
+
+	_battle_rich.text = log_bb
+
+	# auto scroll to bottom when expanded
+	if not _battle_collapsed:
+		await get_tree().process_frame
+		_battle_scroll.scroll_vertical = int(_battle_scroll.get_v_scroll_bar().max_value)
+
 func _on_encounter_ui(payload: Dictionary):
 	if _combat_panel == null:
 		return
 
-	# ✅ Hide clutter UI behind and keep panel readable
 	_set_combat_mode(true)
-
 	_combat_panel.visible = true
 	_combat_close_btn.visible = false
 	_combat_fight_btn.disabled = false
@@ -725,6 +859,10 @@ func _on_encounter_ui(payload: Dictionary):
 	_combat_status.text = str(payload.get("status", ""))
 	_combat_fleet.text = str(payload.get("fleet_bb", ""))
 	_combat_enemy.text = str(payload.get("enemy_bb", ""))
+
+	# ✅ Battle log only during combat UI
+	_set_battle_log_active(true)
+	_update_battle_log_text(payload)
 
 func _on_encounter_end(payload: Dictionary):
 	if _combat_panel == null:
@@ -738,5 +876,13 @@ func _on_encounter_end(payload: Dictionary):
 	_combat_flee_btn.disabled = true
 	_combat_close_btn.visible = true
 
-	# ✅ Keep combat mode until user closes panel (so result stays readable)
-	# _set_combat_mode(false) happens on close
+	# keep log visible while combat panel still open (combat-only requirement)
+	_set_battle_log_active(true)
+	_update_battle_log_text(payload)
+
+func _on_encounter_end_close_cleanup():
+	_set_battle_log_active(false)
+
+# ---------------------------
+# END RUNTIME COMBAT UI
+# ---------------------------

@@ -1,49 +1,49 @@
 {
   "drones": [
-    {
-      "id": "scout_v1",
-      "name": "Scout",
-      "description": "Fast unit for system scanning. High speed, no armor.",
-      "cost": {
-        "iron": 10,
-        "energy": 20
-      },
-      "build_time": 1,
-      "stats": {
-        "firepower": 2,
-        "durability": 5,
-        "speed": 10,
-        "scan_range": 800
-      }
-    },
-    {
-      "id": "miner_v1",
-      "name": "Miner",
-      "description": "Extracts raw ore from systems. Round-based income unit.",
-      "cost": {
-        "iron": 25
-      },
-      "build_time": 2,
-      "stats": {
-        "firepower": 1,
-        "durability": 15,
-        "mining_rate": 20
-      }
-    },
-    {
-      "id": "defender_v1",
-      "name": "Sentinel",
-      "description": "Heavy protection for the Mothership. High durability and firepower.",
-      "cost": {
-        "iron": 40,
-        "energy": 10
-      },
-      "build_time": 3,
-      "stats": {
-        "firepower": 8,
-        "durability": 30,
-        "speed": 2
-      }
-    }
+	{
+	  "id": "scout_v1",
+	  "name": "Scout",
+	  "description": "Fast unit for system scanning. High speed, no armor.",
+	  "cost": {
+		"iron": 10,
+		"energy": 20
+	  },
+	  "build_time": 1,
+	  "stats": {
+		"firepower": 2,
+		"durability": 5,
+		"speed": 10,
+		"scan_range": 800
+	  }
+	},
+	{
+	  "id": "miner_v1",
+	  "name": "Miner",
+	  "description": "Extracts raw ore from systems. Round-based income unit.",
+	  "cost": {
+		"iron": 25
+	  },
+	  "build_time": 2,
+	  "stats": {
+		"firepower": 1,
+		"durability": 15,
+		"mining_rate": 20
+	  }
+	},
+	{
+	  "id": "defender_v1",
+	  "name": "Sentinel",
+	  "description": "Heavy protection for the Mothership. High durability and firepower.",
+	  "cost": {
+		"iron": 40,
+		"energy": 10
+	  },
+	  "build_time": 3,
+	  "stats": {
+		"firepower": 8,
+		"durability": 30,
+		"speed": 2
+	  }
+	}
   ]
 }
