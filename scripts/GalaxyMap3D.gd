@@ -8,68 +8,106 @@ class_name GalaxyMap3D
 var systems: Array = []
 var connections: Array = []
 
-# Typed arrays help Godot's type inference a LOT
 var system_meshes: Array[MeshInstance3D] = []
 var mothership_mesh: Node3D = null
 
-# key (String "s,p") -> Array[Node3D] (miners orbiting that planet)
+# key "s,p" -> Array[Node3D]
 var unit_indicators: Dictionary = {}
 
 # Selection
 var mothership_node: Node = null
 var selected_system_index: int = -1
-var selected_planet_index: int = -1 # -1 means no planet selected within system
+var selected_planet_index: int = -1
 
-# Planets/orbits per system
 var planet_meshes: Dictionary = {} # int -> Array[MeshInstance3D]
 var orbit_meshes: Dictionary = {}  # int -> Array[MeshInstance3D]
 
-# Caches to avoid stutter on planet clicks (no heavy texture/material rebuilds)
-var _planet_noise_cache: Dictionary = {}     # key "s,p" -> NoiseTexture2D
-var _planet_material_cache: Dictionary = {}  # key "s,p,sel" -> StandardMaterial3D
-var _planet_ring_nodes: Dictionary = {}      # key "s,p" -> Node3D (selection ring container)
+var _planet_noise_cache: Dictionary = {}
+var _planet_material_cache: Dictionary = {}
+var _planet_ring_nodes: Dictionary = {}
 
-# RNG: keep layout stable if you want, but enemies random each run
 var _rng_layout: RandomNumberGenerator = RandomNumberGenerator.new()
 var _rng_encounters: RandomNumberGenerator = RandomNumberGenerator.new()
 
-@export var system_count: int = 15
-@export var spread_size: float = 50.0
+# Random start (read by Main.gd)
+var start_system_index: int = 0
 
-# 1/4 - 1/5 ≈ 0.20 - 0.25
+# ----------------------------
+# Export tuning
+# ----------------------------
+
+@export var system_count: int = 28
+
+# Galaxy shape (ellipse X/Z) + thickness Y
+@export var spread_x: float = 85.0
+@export var spread_z: float = 60.0
+@export var spread_y: float = 18.0
+
+# Enemies
 @export var enemy_spawn_chance: float = 0.22
+@export var enemy_min_count: int = 1
+@export var enemy_max_count: int = 4
 
-# ✅ Connection tuning
-@export var connect_max_distance: float = 45.0
-@export var max_neighbors_per_system: int = 3
-@export var extra_connection_chance: float = 0.18 # shortcuts
-@export_range(0.0, 0.6, 0.05) var dead_end_ratio: float = 0.25 # want some degree-1 nodes
+# Enemy scaling with distance from start
+@export var enemy_scale_strength: float = 0.75 # 0.0 = off, 1.0 = strong scaling
+
+# Connections
+@export var connect_max_dist: float = 55.0
+@export var min_links_per_system: int = 1
+
+# extra links but controlled
+@export var extra_link_chance: float = 0.10
+
+# Degree policy:
+# - HARD cap: 4 for everyone
+# - SOFT cap: 3 for ~85% of nodes, 4 for ~15%
+@export var hard_max_links: int = 4
+@export var heavy_degree_ratio: float = 0.15 # 15% allowed to reach 4 (soft cap 3 otherwise)
+
+# Spiral galaxy look
+@export var arm_count: int = 3
+@export var arm_twist: float = 2.6
+@export var arm_spread: float = 0.55
+@export var core_radius: float = 12.0
+@export var core_ratio: float = 0.18
+@export var y_scale: float = 1.55 # ✅ slightly higher disk
+
+# Optional deterministic debug
+@export var use_fixed_seed: bool = false
+@export var fixed_seed: int = 42
 
 const MODEL_PATH := "res://kenney_space-kit/Models/GLTF format/"
 
+# ----------------------------
+# Lifecycle
+# ----------------------------
+
 func _ready() -> void:
-	# Layout: deterministic (nice for debugging). Enemies: random each run.
-	_rng_layout.seed = 42
+	if use_fixed_seed:
+		_rng_layout.seed = fixed_seed
+	else:
+		_rng_layout.randomize()
+
 	_rng_encounters.randomize()
 
 	generate_map_3d()
+
 	if get_parent() and get_parent().has_node("Managers/Mothership"):
 		mothership_node = get_parent().get_node("Managers/Mothership")
 
+# ----------------------------
+# Cleanup
+# ----------------------------
 
-# ----------------------------
-# FIX: cleanup generated nodes
-# ----------------------------
+func _tag_generated(n: Node) -> void:
+	if n != null:
+		n.set_meta("_gen", true)
 
 func _clear_generated_nodes() -> void:
-	# We only delete nodes created at runtime by this script.
-	# Those nodes are tagged with meta "_gen" = true.
-	var children: Array = get_children()
-	for c in children:
+	for c in get_children():
 		if c != null and is_instance_valid(c) and c.has_meta("_gen") and bool(c.get_meta("_gen")):
 			(c as Node).queue_free()
 
-	# also clear our references (safe even if nodes are already queued)
 	system_meshes.clear()
 	mothership_mesh = null
 	connections.clear()
@@ -82,12 +120,6 @@ func _clear_generated_nodes() -> void:
 	_planet_noise_cache.clear()
 	_planet_material_cache.clear()
 
-
-func _tag_generated(n: Node) -> void:
-	if n != null:
-		n.set_meta("_gen", true)
-
-
 # ----------------------------
 # Map generation
 # ----------------------------
@@ -95,44 +127,31 @@ func _tag_generated(n: Node) -> void:
 func generate_map_3d() -> void:
 	print("Generating 3D galaxy map...")
 
-	# ✅ IMPORTANT: delete ALL runtime-generated nodes (prevents ghost lines / old starfields)
 	_clear_generated_nodes()
+	systems.clear()
 
-	# base material for stars
+	# choose start early (random per run)
+	start_system_index = _rng_layout.randi_range(0, max(0, system_count - 1))
+
 	var base_mat: StandardMaterial3D = StandardMaterial3D.new()
 	base_mat.albedo_color = Color(0.5, 0.5, 0.5)
 	base_mat.emission_enabled = true
 	base_mat.emission = Color(0.2, 0.4, 0.6)
 
-	systems.clear()
-
 	for i in range(system_count):
-		# System data
+		var pos: Vector3 = _random_galaxy_position()
+
 		var system: Dictionary = {
 			"index": i,
 			"name": "System " + str(i),
-			"position": Vector3(
-				_rng_layout.randf_range(-spread_size, spread_size),
-				_rng_layout.randf_range(-spread_size / 5.0, spread_size / 5.0),
-				_rng_layout.randf_range(-spread_size, spread_size)
-			),
+			"position": pos,
 			"planets": [],
 			"scanned": false,
 			"enemies": [],
 			"star_type": _get_random_star_type(_rng_layout)
 		}
 
-		# Spawn enemies (random every run)
-		if i > 1 and _rng_encounters.randf() < enemy_spawn_chance:
-			var enemies_data = Global.get("enemies_data")
-			if enemies_data is Array and (enemies_data as Array).size() > 0:
-				var pool: Array = enemies_data as Array
-				var enemy_type: Dictionary = pool[_rng_encounters.randi_range(0, pool.size() - 1)]
-				var count: int = _rng_encounters.randi_range(1, 4)
-				for c in range(count):
-					system["enemies"].append(enemy_type.duplicate(true))
-
-		# Generate 2-5 planets
+		# Planets 2..5
 		var planet_count: int = _rng_layout.randi_range(2, 5)
 		for p in range(planet_count):
 			var planet: Dictionary = {
@@ -157,7 +176,7 @@ func generate_map_3d() -> void:
 
 		var sm: SphereMesh = SphereMesh.new()
 		star_mesh.mesh = sm
-		star_mesh.position = system["position"]
+		star_mesh.position = pos
 
 		var star_visuals: Dictionary = _get_star_visuals(str(system["star_type"]))
 		var mat: StandardMaterial3D = base_mat.duplicate()
@@ -172,214 +191,356 @@ func generate_map_3d() -> void:
 		add_child(star_mesh)
 		system_meshes.append(star_mesh)
 
-	# ✅ NEW: Connection graph generation (interesting paths)
-	_build_connections_graph()
+	# connections first (so we have a good spread)
+	_generate_connections()
+
+	# enemies AFTER we know start and positions are set
+	_generate_enemies_random_scaled()
 
 	_create_mothership_mesh()
 	_create_starfield()
 
-	# initial visual state
 	update_selection_visuals()
 
+# ----------------------------
+# Enemies: random + scaled by distance from random start
+# ----------------------------
+
+func _generate_enemies_random_scaled() -> void:
+	var enemies_data = Global.get("enemies_data")
+	if not (enemies_data is Array) or (enemies_data as Array).size() == 0:
+		return
+
+	var pool: Array = enemies_data as Array
+	var start_pos: Vector3 = systems[start_system_index]["position"]
+
+	# compute max distance for normalization
+	var max_d: float = 0.01
+	for s in systems:
+		var d: float = (s as Dictionary)["position"].distance_to(start_pos)
+		if d > max_d:
+			max_d = d
+
+	for i in range(systems.size()):
+		var system: Dictionary = systems[i]
+		system["enemies"] = []
+
+		# keep start & very close area mostly safe
+		if i == start_system_index:
+			continue
+
+		# spawn roll
+		if _rng_encounters.randf() >= enemy_spawn_chance:
+			continue
+
+		var enemy_type: Dictionary = pool[_rng_encounters.randi_range(0, pool.size() - 1)]
+		var count: int = _rng_encounters.randi_range(enemy_min_count, enemy_max_count)
+
+		# scale factor 1.0 .. (1.0 + enemy_scale_strength)
+		var d01: float = system["position"].distance_to(start_pos) / max_d
+		d01 = clamp(d01, 0.0, 1.0)
+		var scale: float = 1.0 + (enemy_scale_strength * d01)
+
+		# further away: sometimes +1 extra enemy
+		if d01 > 0.66 and _rng_encounters.randf() < 0.45:
+			count += 1
+
+		for _c in range(count):
+			var e: Dictionary = enemy_type.duplicate(true)
+			_scale_enemy_dict(e, scale)
+			system["enemies"].append(e)
+
+func _scale_enemy_dict(e: Dictionary, scale: float) -> void:
+	# supports both formats: stats:{durability, firepower} or flat keys
+	if e.has("stats") and typeof(e["stats"]) == TYPE_DICTIONARY:
+		var st: Dictionary = e["stats"] as Dictionary
+		if st.has("durability"):
+			st["durability"] = max(1, int(round(float(st["durability"]) * scale)))
+		if st.has("firepower"):
+			st["firepower"] = max(1, int(round(float(st["firepower"]) * lerp(1.0, 1.0 + (scale - 1.0) * 0.75, 1.0))))
+		e["stats"] = st
+	else:
+		if e.has("durability"):
+			e["durability"] = max(1, int(round(float(e["durability"]) * scale)))
+		if e.has("firepower"):
+			e["firepower"] = max(1, int(round(float(e["firepower"]) * lerp(1.0, 1.0 + (scale - 1.0) * 0.75, 1.0))))
 
 # ----------------------------
-# Connection graph (MST + extras + dead ends)
+# Spiral galaxy position
 # ----------------------------
 
-func _build_connections_graph() -> void:
+func _random_galaxy_position() -> Vector3:
+	var in_core: bool = (_rng_layout.randf() < core_ratio)
+
+	var u: float = _rng_layout.randf()
+	var r01: float = pow(u, 0.55)
+	if in_core:
+		r01 = pow(_rng_layout.randf(), 1.6)
+
+	var r_x: float = r01 * spread_x
+	var r_z: float = r01 * spread_z
+
+	var arm_index: int = _rng_layout.randi_range(0, max(0, arm_count - 1))
+	var arm_base: float = (TAU / float(max(1, arm_count))) * float(arm_index)
+
+	var twist: float = arm_twist * r01 * TAU * 0.25
+	var jitter: float = _rng_layout.randfn(0.0, arm_spread) * lerp(0.35, 1.0, r01)
+
+	var angle: float = arm_base + twist + jitter
+	if in_core:
+		angle = _rng_layout.randf() * TAU
+
+	var x: float = cos(angle) * r_x
+	var z: float = sin(angle) * r_z
+
+	if in_core:
+		x = clamp(x, -core_radius, core_radius) + _rng_layout.randfn(0.0, 2.0)
+		z = clamp(z, -core_radius, core_radius) + _rng_layout.randfn(0.0, 2.0)
+
+	var y: float = _rng_layout.randfn(0.0, 1.0) * (spread_y * 0.30) * y_scale
+	y = clamp(y, -spread_y * y_scale, spread_y * y_scale)
+
+	x = clamp(x, -spread_x, spread_x)
+	z = clamp(z, -spread_z, spread_z)
+
+	return Vector3(x, y, z)
+
+# ----------------------------
+# Union-Find helpers (NO nested funcs)
+# ----------------------------
+
+func _uf_find(parent: Array, x: int) -> int:
+	var y: int = x
+	while int(parent[y]) != y:
+		parent[y] = parent[int(parent[y])]
+		y = int(parent[y])
+	return y
+
+func _uf_unite(parent: Array, rank: Array, a: int, b: int) -> bool:
+	var ra: int = _uf_find(parent, a)
+	var rb: int = _uf_find(parent, b)
+	if ra == rb:
+		return false
+
+	if int(rank[ra]) < int(rank[rb]):
+		var tmp: int = ra
+		ra = rb
+		rb = tmp
+
+	parent[rb] = ra
+	if int(rank[ra]) == int(rank[rb]):
+		rank[ra] = int(rank[ra]) + 1
+	return true
+
+# ----------------------------
+# Connections generation
+# ----------------------------
+
+func _generate_connections() -> void:
 	connections.clear()
 	if systems.size() <= 1:
 		return
 
-	# Precompute all candidate edges under distance limit
+	# soft caps: most nodes max 3, few max 4
+	var cap: Array = _build_degree_caps(systems.size())
+
 	var edges: Array = []
 	for i in range(systems.size()):
+		var a: Vector3 = systems[i]["position"]
 		for j in range(i + 1, systems.size()):
-			var a: Vector3 = systems[i]["position"]
 			var b: Vector3 = systems[j]["position"]
-			var d := a.distance_to(b)
-			if d <= connect_max_distance:
-				edges.append({"i": i, "j": j, "d": d})
+			var d: float = a.distance_to(b)
+			if d <= connect_max_dist:
+				edges.append({"a": i, "b": j, "d": d})
 
-	# Fallback: if too sparse, loosen constraint once (prevents disconnected graphs)
-	if edges.size() == 0:
+	# fallback if too sparse
+	if edges.size() < systems.size() - 1:
 		for i2 in range(systems.size()):
+			var a2: Vector3 = systems[i2]["position"]
 			for j2 in range(i2 + 1, systems.size()):
-				var a2: Vector3 = systems[i2]["position"]
 				var b2: Vector3 = systems[j2]["position"]
-				var d2 := a2.distance_to(b2)
-				edges.append({"i": i2, "j": j2, "d": d2})
+				var d2: float = a2.distance_to(b2)
+				if d2 <= connect_max_dist * 1.25:
+					edges.append({"a": i2, "b": j2, "d": d2})
 
-	# Sort by distance (for MST / cheap edges)
-	edges.sort_custom(func(a, b): return float(a["d"]) < float(b["d"]))
+	edges.sort_custom(func(e1, e2): return float(e1["d"]) < float(e2["d"]))
 
-	# Degree tracking
-	var degree: Array[int] = []
-	degree.resize(systems.size())
-	for k in range(degree.size()):
-		degree[k] = 0
-
-	# Union-Find parent array
-	var parent: Array[int] = []
+	var parent: Array = []
+	var rank: Array = []
 	parent.resize(systems.size())
-	for p in range(parent.size()):
-		parent[p] = p
+	rank.resize(systems.size())
+	for k in range(systems.size()):
+		parent[k] = k
+		rank[k] = 0
 
-	# --- Build MST ---
-	var mst_edges: Array = []
+	# degree map
+	var deg: Array = []
+	deg.resize(systems.size())
+	for i4 in range(deg.size()):
+		deg[i4] = 0
+
+	# MST first (guarantees reachability)
 	for e in edges:
-		var i3 := int(e["i"])
-		var j3 := int(e["j"])
-		if _uf_unite(parent, i3, j3):
-			mst_edges.append(e)
-			degree[i3] += 1
-			degree[j3] += 1
-			if mst_edges.size() == systems.size() - 1:
+		var ai: int = int(e["a"])
+		var bi: int = int(e["b"])
+
+		# hard cap: never exceed hard_max_links
+		if int(deg[ai]) >= hard_max_links or int(deg[bi]) >= hard_max_links:
+			continue
+
+		if _uf_unite(parent, rank, ai, bi):
+			connections.append([ai, bi])
+			deg[ai] = int(deg[ai]) + 1
+			deg[bi] = int(deg[bi]) + 1
+
+	# ensure each node has at least min_links_per_system (but never exceed hard cap)
+	for i5 in range(systems.size()):
+		while int(deg[i5]) < min_links_per_system and int(deg[i5]) < hard_max_links:
+			var best_j: int = -1
+			var best_d: float = 999999.0
+			var pos_i: Vector3 = systems[i5]["position"]
+
+			for j5 in range(systems.size()):
+				if j5 == i5:
+					continue
+				if _has_connection(i5, j5):
+					continue
+				if int(deg[j5]) >= hard_max_links:
+					continue
+
+				var d5: float = pos_i.distance_to(systems[j5]["position"])
+				if d5 < best_d:
+					best_d = d5
+					best_j = j5
+
+			if best_j == -1:
 				break
 
-	# If still not connected (rare), force-connect with nearest edges
-	if mst_edges.size() < systems.size() - 1:
-		for e2 in edges:
-			var a_idx := int(e2["i"])
-			var b_idx := int(e2["j"])
-			if _uf_unite(parent, a_idx, b_idx):
-				mst_edges.append(e2)
-				degree[a_idx] += 1
-				degree[b_idx] += 1
-				if mst_edges.size() == systems.size() - 1:
-					break
+			connections.append([i5, best_j])
+			deg[i5] = int(deg[i5]) + 1
+			deg[best_j] = int(deg[best_j]) + 1
 
-	# Add MST edges (always)
-	for e3 in mst_edges:
-		_add_connection(int(e3["i"]), int(e3["j"]))
-
-	# Dead-end preference
-	var target_dead_ends := int(round(float(systems.size()) * dead_end_ratio))
-
-	# --- Add extra edges (shortcuts) but limit per node ---
-	for e4 in edges:
-		if _rng_layout.randf() > extra_connection_chance:
+	# occasional cross-links (controlled) honoring SOFT caps (3 for most, 4 for few)
+	for e2 in edges:
+		if _rng_layout.randf() > extra_link_chance:
 			continue
 
-		var a2_idx := int(e4["i"])
-		var b2_idx := int(e4["j"])
+		var a6: int = int(e2["a"])
+		var b6: int = int(e2["b"])
 
-		# already connected?
-		if is_system_connected(a2_idx, b2_idx):
+		if _has_connection(a6, b6):
 			continue
 
-		# Respect max neighbors
-		if degree[a2_idx] >= max_neighbors_per_system:
-			continue
-		if degree[b2_idx] >= max_neighbors_per_system:
+		# hard cap always
+		if int(deg[a6]) >= hard_max_links or int(deg[b6]) >= hard_max_links:
 			continue
 
-		# Prefer leaving some degree-1 systems as dead ends
-		var current_dead_ends := 0
-		for dval in degree:
-			if dval <= 1:
-				current_dead_ends += 1
+		# soft cap: most nodes max 3
+		if int(deg[a6]) >= int(cap[a6]):
+			continue
+		if int(deg[b6]) >= int(cap[b6]):
+			continue
 
-		if current_dead_ends < target_dead_ends:
-			if degree[a2_idx] <= 1 or degree[b2_idx] <= 1:
-				continue
+		connections.append([a6, b6])
+		deg[a6] = int(deg[a6]) + 1
+		deg[b6] = int(deg[b6]) + 1
 
-		_add_connection(a2_idx, b2_idx)
-		degree[a2_idx] += 1
-		degree[b2_idx] += 1
-
-	# Draw lines (based on `connections`)
-	for c in connections:
-		var ia: int = int(c[0])
-		var ib: int = int(c[1])
-		_draw_connection(systems[ia]["position"], systems[ib]["position"])
-
-
-func _add_connection(i: int, j: int) -> void:
-	# normalize order to reduce duplicates
-	var a := mini(i, j)
-	var b := maxi(i, j)
+	# draw lines
 	for conn in connections:
-		if int(conn[0]) == a and int(conn[1]) == b:
-			return
-	connections.append([a, b])
+		var a_pos: Vector3 = systems[conn[0]]["position"]
+		var b_pos: Vector3 = systems[conn[1]]["position"]
+		_draw_connection(a_pos, b_pos)
 
+func _build_degree_caps(n: int) -> Array:
+	var caps: Array = []
+	caps.resize(n)
+
+	# default soft cap: 3
+	for i in range(n):
+		caps[i] = 3
+
+	# pick ~15% nodes that are allowed to reach 4
+	var heavy_count: int = int(round(float(n) * clamp(heavy_degree_ratio, 0.0, 1.0)))
+	heavy_count = clamp(heavy_count, 0, n)
+
+	var picked: Dictionary = {}
+	var tries: int = 0
+	while picked.size() < heavy_count and tries < 9999:
+		tries += 1
+		var idx: int = _rng_layout.randi_range(0, n - 1)
+		if picked.has(idx):
+			continue
+		picked[idx] = true
+		caps[idx] = 4
+
+	# enforce hard cap anyway
+	for j in range(n):
+		caps[j] = min(int(caps[j]), hard_max_links)
+
+	return caps
+
+func _has_connection(a: int, b: int) -> bool:
+	for conn in connections:
+		if (conn[0] == a and conn[1] == b) or (conn[0] == b and conn[1] == a):
+			return true
+	return false
+
+func is_system_connected(a: int, b: int) -> bool:
+	return _has_connection(a, b)
 
 # ----------------------------
-# Union-Find helpers (Godot-safe, no local lambdas)
-# ----------------------------
-
-func _uf_find(parent: Array[int], x: int) -> int:
-	var r := x
-	while parent[r] != r:
-		r = parent[r]
-
-	# path compression
-	var y := x
-	while parent[y] != y:
-		var nxt := parent[y]
-		parent[y] = r
-		y = nxt
-
-	return r
-
-func _uf_unite(parent: Array[int], a: int, b: int) -> bool:
-	var ra := _uf_find(parent, a)
-	var rb := _uf_find(parent, b)
-	if ra == rb:
-		return false
-	parent[rb] = ra
-	return true
-
-
-# ----------------------------
-# Starfield / Ship
+# Starfield + mothership
 # ----------------------------
 
 func _create_starfield() -> void:
-	var star_count: int = 600
+	var star_count: int = 450
 	var container: Node3D = Node3D.new()
 	container.name = "Starfield"
 	_tag_generated(container)
 	add_child(container)
 
-	var star_mesh := PointMesh.new()
+	var tiny: SphereMesh = SphereMesh.new()
+	tiny.radius = 0.08
+	tiny.height = 0.16
+
 	var mat: StandardMaterial3D = StandardMaterial3D.new()
 	mat.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
-	mat.use_point_size = true
-	mat.point_size = 2.0
-	mat.vertex_color_use_as_albedo = true
+	mat.emission_enabled = true
+	mat.emission = Color(0.7, 0.8, 1.0)
+	mat.emission_energy_multiplier = 1.0
 
-	var multi_mesh: MultiMesh = MultiMesh.new()
-	multi_mesh.mesh = star_mesh
-	multi_mesh.transform_format = MultiMesh.TRANSFORM_3D
-	multi_mesh.use_colors = true
-	multi_mesh.instance_count = star_count
+	var mm: MultiMesh = MultiMesh.new()
+	mm.mesh = tiny
+	mm.transform_format = MultiMesh.TRANSFORM_3D
+	mm.use_colors = true
+	mm.instance_count = star_count
 
 	for i in range(star_count):
-		var pos: Vector3 = Vector3(
+		var dir := Vector3(
 			_rng_layout.randf_range(-1, 1),
 			_rng_layout.randf_range(-1, 1),
 			_rng_layout.randf_range(-1, 1)
-		).normalized() * 500.0
+		)
+		if dir.length() < 0.01:
+			dir = Vector3(1, 0, 0)
+		dir = dir.normalized()
 
-		var xform: Transform3D = Transform3D(Basis(), pos)
-		multi_mesh.set_instance_transform(i, xform)
+		var pos: Vector3 = dir * _rng_layout.randf_range(320.0, 520.0)
+		mm.set_instance_transform(i, Transform3D(Basis(), pos))
 
-		var c: Color = Color(0.8, 0.9, 1.0)
 		var roll: float = _rng_layout.randf()
-		if roll > 0.9:
+		var c: Color = Color(0.8, 0.9, 1.0)
+		if roll > 0.92:
 			c = Color(1.0, 0.8, 0.8)
-		elif roll > 0.7:
-			c = Color(1.0, 1.0, 0.8)
-		multi_mesh.set_instance_color(i, c)
+		elif roll > 0.75:
+			c = Color(1.0, 1.0, 0.85)
+		mm.set_instance_color(i, c)
 
-	var mm_instance: MultiMeshInstance3D = MultiMeshInstance3D.new()
-	mm_instance.multimesh = multi_mesh
-	mm_instance.material_override = mat
-	_tag_generated(mm_instance)
-	container.add_child(mm_instance)
-
+	var inst: MultiMeshInstance3D = MultiMeshInstance3D.new()
+	_tag_generated(inst)
+	inst.multimesh = mm
+	inst.material_override = mat
+	container.add_child(inst)
 
 func _create_mothership_mesh() -> void:
 	if mothership_mesh and is_instance_valid(mothership_mesh):
@@ -406,13 +567,11 @@ func _create_mothership_mesh() -> void:
 		add_child(fallback)
 		mothership_mesh = fallback
 
-
 # ----------------------------
-# Visual updates (selection / planets / miners)
+# Selection visuals
 # ----------------------------
 
 func update_selection_visuals() -> void:
-	# Stars highlight
 	for i in range(system_meshes.size()):
 		var star_node: MeshInstance3D = system_meshes[i]
 		if star_node == null:
@@ -429,21 +588,20 @@ func update_selection_visuals() -> void:
 		else:
 			mat.emission_energy_multiplier = 0.5
 
-	# Mothership position
 	if mothership_node and mothership_mesh:
 		var current_idx: int = int(mothership_node.get_current_system())
 		if current_idx >= 0 and current_idx < systems.size():
-			var target_pos: Vector3 = (systems[current_idx]["position"] as Vector3) + Vector3(0, 3, 0)
-			mothership_mesh.position = target_pos
+			mothership_mesh.position = (systems[current_idx]["position"] as Vector3) + Vector3(0, 3, 0)
 
-	# Planets/miners
 	_ensure_active_planets()
 	_refresh_planet_highlights()
 	_update_unit_indicators()
 
+# ----------------------------
+# Planets (unchanged from your current logic)
+# ----------------------------
 
 func _ensure_active_planets() -> void:
-	# Show planets only for: current system + selected system
 	var active: Array[int] = []
 
 	if mothership_node:
@@ -454,24 +612,20 @@ func _ensure_active_planets() -> void:
 	if selected_system_index >= 0 and selected_system_index < systems.size() and !active.has(selected_system_index):
 		active.append(selected_system_index)
 
-	# Remove planets for systems that are no longer active
-	var existing_keys := planet_meshes.keys()
-	for k in existing_keys:
+	for k in planet_meshes.keys():
 		var sys_idx: int = int(k)
 		if !active.has(sys_idx):
 			_clear_planet_visuals(sys_idx)
 
-	# Create planets for active scanned systems if missing
-	for sys_idx in active:
-		var sys: Dictionary = systems[sys_idx]
+	for sys_idx2 in active:
+		var sys: Dictionary = systems[sys_idx2]
 		if !bool(sys["scanned"]):
-			# ensure nothing is shown if unscanned
-			_clear_planet_visuals(sys_idx)
+			_clear_planet_visuals(sys_idx2)
 			continue
 
-		if !planet_meshes.has(sys_idx):
-			planet_meshes[sys_idx] = []
-			orbit_meshes[sys_idx] = []
+		if !planet_meshes.has(sys_idx2):
+			planet_meshes[sys_idx2] = []
+			orbit_meshes[sys_idx2] = []
 
 			var planets: Array = sys["planets"]
 			for p_idx in range(planets.size()):
@@ -484,18 +638,15 @@ func _ensure_active_planets() -> void:
 				sm.height = 0.8
 				planet_node.mesh = sm
 
-				planet_node.set_meta("system_index", sys_idx)
+				planet_node.set_meta("system_index", sys_idx2)
 				planet_node.set_meta("planet_index", p_idx)
 
-				# initial material (not selected by default)
-				planet_node.material_override = _get_planet_material_cached(sys_idx, p_idx, p_data, false)
+				planet_node.material_override = _get_planet_material_cached(sys_idx2, p_idx, p_data, false)
 
 				add_child(planet_node)
-				(planet_meshes[sys_idx] as Array).append(planet_node)
+				(planet_meshes[sys_idx2] as Array).append(planet_node)
 
-				# orbit path once per planet
-				_draw_orbit_path(sys_idx, float(p_data["orbit_radius"]))
-
+				_draw_orbit_path(sys_idx2, float(p_data["orbit_radius"]))
 
 func _refresh_planet_highlights() -> void:
 	for sys_key in planet_meshes.keys():
@@ -514,7 +665,6 @@ func _refresh_planet_highlights() -> void:
 
 			planet_node.material_override = _get_planet_material_cached(idx, p_idx, p_data, is_selected)
 
-			# Selection ring
 			var key: String = "%d,%d" % [idx, p_idx]
 			if is_selected:
 				if !_planet_ring_nodes.has(key) or !is_instance_valid(_planet_ring_nodes[key]):
@@ -525,7 +675,6 @@ func _refresh_planet_highlights() -> void:
 					(_planet_ring_nodes[key] as Node).queue_free()
 				_planet_ring_nodes.erase(key)
 
-
 func _get_planet_material_cached(sys_idx: int, p_idx: int, p_data: Dictionary, is_selected: bool) -> StandardMaterial3D:
 	var key_mat: String = "%d,%d,%d" % [sys_idx, p_idx, (1 if is_selected else 0)]
 	if _planet_material_cache.has(key_mat):
@@ -533,7 +682,6 @@ func _get_planet_material_cached(sys_idx: int, p_idx: int, p_data: Dictionary, i
 
 	var mat: StandardMaterial3D = StandardMaterial3D.new()
 
-	# Noise texture per planet (cached)
 	var key_noise: String = "%d,%d" % [sys_idx, p_idx]
 	var noise_tex: NoiseTexture2D
 
@@ -554,7 +702,6 @@ func _get_planet_material_cached(sys_idx: int, p_idx: int, p_data: Dictionary, i
 
 	mat.albedo_texture = noise_tex
 
-	# Base look by resources
 	var res: Dictionary = p_data["resources"]
 
 	if int(res.get("uranium", 0)) > 0:
@@ -569,7 +716,6 @@ func _get_planet_material_cached(sys_idx: int, p_idx: int, p_data: Dictionary, i
 		mat.albedo_color = Color(0.7, 0.4, 0.2)
 		mat.roughness = 0.9
 
-	# Selection glow
 	if is_selected:
 		mat.emission_enabled = true
 		mat.emission = Color(0.0, 0.6, 1.0)
@@ -577,7 +723,6 @@ func _get_planet_material_cached(sys_idx: int, p_idx: int, p_data: Dictionary, i
 
 	_planet_material_cache[key_mat] = mat
 	return mat
-
 
 func _add_selection_ring(parent_node: Node3D) -> Node3D:
 	var bracket_scene: Node3D = Node3D.new()
@@ -603,7 +748,6 @@ func _add_selection_ring(parent_node: Node3D) -> Node3D:
 		line.rotation_degrees = Vector3(0, -rad_to_deg(angle), 0)
 
 	return bracket_scene
-
 
 func _draw_orbit_path(sys_idx: int, radius: float) -> void:
 	if !orbit_meshes.has(sys_idx):
@@ -633,7 +777,6 @@ func _draw_orbit_path(sys_idx: int, radius: float) -> void:
 	add_child(mesh_instance)
 	(orbit_meshes[sys_idx] as Array).append(mesh_instance)
 
-
 func _clear_planet_visuals(sys_idx: int) -> void:
 	if planet_meshes.has(sys_idx):
 		for n in planet_meshes[sys_idx]:
@@ -647,7 +790,6 @@ func _clear_planet_visuals(sys_idx: int) -> void:
 				(n as Node).queue_free()
 		orbit_meshes.erase(sys_idx)
 
-	# remove rings for this system
 	var keys := _planet_ring_nodes.keys()
 	for k in keys:
 		var parts := str(k).split(",")
@@ -656,16 +798,13 @@ func _clear_planet_visuals(sys_idx: int) -> void:
 				(_planet_ring_nodes[k] as Node).queue_free()
 			_planet_ring_nodes.erase(k)
 
-
 # ----------------------------
-# Miners (indicators)
+# Miners indicators
 # ----------------------------
 
 func _update_unit_indicators() -> void:
-	# Clear old
 	for k in unit_indicators.keys():
-		var arr_old: Array = unit_indicators[k]
-		for mesh in arr_old:
+		for mesh in unit_indicators[k]:
 			if is_instance_valid(mesh):
 				(mesh as Node).queue_free()
 	unit_indicators.clear()
@@ -678,7 +817,6 @@ func _update_unit_indicators() -> void:
 		return
 
 	var mining_manager: Node = managers.get_node("MiningManager")
-
 	var miner_scene = load(MODEL_PATH + "craft_miner.glb")
 
 	for key in mining_manager.deployments:
@@ -689,7 +827,6 @@ func _update_unit_indicators() -> void:
 
 		var s_idx: int = int(parts[0])
 
-		# Only show if system is active (selected or current)
 		var is_active: bool = (s_idx == selected_system_index)
 		if mothership_node:
 			is_active = is_active or (s_idx == int(mothership_node.get_current_system()))
@@ -698,9 +835,8 @@ func _update_unit_indicators() -> void:
 
 		unit_indicators[key] = []
 
-		for k2 in range(count):
+		for _k2 in range(count):
 			var miner_node: Node3D
-
 			if miner_scene:
 				miner_node = (miner_scene as PackedScene).instantiate()
 				_tag_generated(miner_node)
@@ -722,15 +858,13 @@ func _update_unit_indicators() -> void:
 			add_child(miner_node)
 			(unit_indicators[key] as Array).append(miner_node)
 
-
 # ----------------------------
-# Runtime updates
+# Process
 # ----------------------------
 
 func _process(_delta: float) -> void:
 	var time: float = float(Time.get_ticks_msec()) * 0.001
 
-	# Planet orbits
 	for sys_idx_key in planet_meshes.keys():
 		var s_idx: int = int(sys_idx_key)
 		var sys_pos: Vector3 = systems[s_idx]["position"]
@@ -748,7 +882,6 @@ func _process(_delta: float) -> void:
 			var offset_p: Vector3 = Vector3(cos(angle_p), 0, sin(angle_p)) * float(p_data["orbit_radius"])
 			p_mesh.position = sys_pos + offset_p
 
-	# Miner positions (orbit planet)
 	for key in unit_indicators.keys():
 		var parts: PackedStringArray = str(key).split(",")
 		if parts.size() < 2:
@@ -774,17 +907,9 @@ func _process(_delta: float) -> void:
 				var offset_m: Vector3 = Vector3(cos(angle_m), 0.5, sin(angle_m)) * 0.8
 				miner_node.position = p_mesh2.position + offset_m
 
-
 # ----------------------------
-# Helpers
+# Drawing connections
 # ----------------------------
-
-func is_system_connected(a: int, b: int) -> bool:
-	for conn in connections:
-		if (conn[0] == a and conn[1] == b) or (conn[0] == b and conn[1] == a):
-			return true
-	return false
-
 
 func _draw_connection(start: Vector3, end: Vector3) -> void:
 	var mesh_instance: MeshInstance3D = MeshInstance3D.new()
@@ -808,6 +933,9 @@ func _draw_connection(start: Vector3, end: Vector3) -> void:
 
 	add_child(mesh_instance)
 
+# ----------------------------
+# Star type
+# ----------------------------
 
 func _get_random_star_type(rng: RandomNumberGenerator) -> String:
 	var roll: float = rng.randf()
@@ -818,7 +946,6 @@ func _get_random_star_type(rng: RandomNumberGenerator) -> String:
 	if roll < 0.50: return "G"
 	if roll < 0.75: return "K"
 	return "M"
-
 
 func _get_star_visuals(t: String) -> Dictionary:
 	match t:
