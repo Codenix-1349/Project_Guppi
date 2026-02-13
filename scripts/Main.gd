@@ -43,7 +43,6 @@ extends Node
 @onready var print_defender_btn = $UI/Control/Fabricator/PrintDefender
 
 # --- UI containers we may hide during combat (best-effort: only if exist) ---
-@onready var _ui_root: Control = $UI/Control
 @onready var _ui_action_buttons: Control = $UI/Control/ActionButtons
 @onready var _ui_printer_status: Control = $UI/Control/PrinterStatus
 @onready var _ui_fabricator: Control = $UI/Control/Fabricator
@@ -95,6 +94,9 @@ func _ready():
 		galaxy_map.mothership_node = mothership
 		galaxy_map.generate_map_3d()
 
+		# ✅ NEW: Apply random start system (if GalaxyMap3D provides it)
+		_apply_random_start_system_if_available()
+
 		# ✅ Auto-focus at game start (after nodes are ready)
 		call_deferred("_focus_camera_on_start")
 
@@ -104,6 +106,32 @@ func _ready():
 
 	_on_phase_changed(turn_manager.current_phase)
 	update_ui()
+
+
+# ✅ NEW: Apply random start system coming from GalaxyMap3D
+func _apply_random_start_system_if_available() -> void:
+	if galaxy_map == null:
+		return
+
+	var start_idx: int = 0
+	if "start_system_index" in galaxy_map:
+		start_idx = int(galaxy_map.start_system_index)
+
+	# Use mothership helper if present; fallback to direct property
+	if mothership != null:
+		if mothership.has_method("set_current_system"):
+			mothership.set_current_system(start_idx)
+		else:
+			# fallback: your Mothership has current_system_index in the file you pasted
+			mothership.current_system_index = start_idx
+			if mothership.has_signal("system_changed"):
+				mothership.emit_signal("system_changed", start_idx)
+
+	# Make selection visuals consistent at start
+	if galaxy_map.has_method("update_selection_visuals"):
+		galaxy_map.selected_system_index = -1
+		galaxy_map.selected_planet_index = -1
+		galaxy_map.update_selection_visuals()
 
 
 # ✅ NEW: start camera focus on mothership / current system
@@ -557,6 +585,7 @@ func _process_3d_selection(mouse_pos, is_double_click = false):
 	galaxy_map.update_selection_visuals()
 	update_ui()
 
+
 # ---------------------------
 # RUNTIME COMBAT UI (no new files)
 # ---------------------------
@@ -600,7 +629,8 @@ func _set_combat_mode(active: bool) -> void:
 	if active:
 		_saved_vis.clear()
 		for n in nodes_to_toggle:
-			if n == null: continue
+			if n == null:
+				continue
 			_saved_vis[n.get_path()] = n.visible
 			n.visible = false
 	else:
@@ -798,7 +828,6 @@ func _setup_battle_log_ui():
 	_battle_toggle_btn.pressed.connect(func():
 		_battle_collapsed = !_battle_collapsed
 		_apply_battle_log_layout()
-		# if user opens: scroll to bottom
 		if not _battle_collapsed:
 			call_deferred("_scroll_battle_log_to_bottom")
 	)
@@ -811,7 +840,7 @@ func _setup_battle_log_ui():
 	_battle_rich = RichTextLabel.new()
 	_battle_rich.bbcode_enabled = true
 	_battle_rich.scroll_active = false
-	_battle_rich.fit_content = false  # ✅ IMPORTANT (inside ScrollContainer)
+	_battle_rich.fit_content = false
 	_battle_rich.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	_battle_rich.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	_battle_rich.text = ""
@@ -863,10 +892,8 @@ func _update_battle_log_text(payload: Dictionary) -> void:
 	elif combat_manager and combat_manager.has_method("get_log_bb"):
 		log_bb = str(combat_manager.get_log_bb())
 
-	# ✅ Always set text, even while collapsed (so opening shows content immediately)
 	_battle_rich.text = log_bb
 
-	# auto scroll to bottom when expanded
 	if not _battle_collapsed:
 		call_deferred("_scroll_battle_log_to_bottom")
 
@@ -892,13 +919,9 @@ func _on_encounter_ui(payload: Dictionary):
 	_combat_fleet.text = str(payload.get("fleet_bb", ""))
 	_combat_enemy.text = str(payload.get("enemy_bb", ""))
 
-	# ✅ Battle log during combat
 	_set_battle_log_active(true)
-
-	# ✅ Auto-open once so you SEE it's working
 	_battle_collapsed = false
 	_apply_battle_log_layout()
-
 	_update_battle_log_text(payload)
 
 func _on_encounter_end(payload: Dictionary):
@@ -915,6 +938,3 @@ func _on_encounter_end(payload: Dictionary):
 
 	_set_battle_log_active(true)
 	_update_battle_log_text(payload)
-
-func _on_encounter_end_close_cleanup():
-	_set_battle_log_active(false)

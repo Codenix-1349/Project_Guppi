@@ -11,12 +11,18 @@ signal energy_depleted()
 func _ready():
 	print("Mothership initialized at system ", current_system_index)
 
+# ✅ NEW: allow setting start system without energy cost
+func set_current_system(system_index: int) -> void:
+	current_system_index = system_index
+	emit_signal("system_changed", current_system_index)
+	print("Mothership start set to system ", system_index)
+
 func jump_to_system(system_index: int) -> Dictionary:
 	# Check if enough energy
 	if Global.resources.energy < jump_cost:
 		emit_signal("energy_depleted")
 		return {"success": false, "message": "INSUFFICIENT ENERGY FOR JUMP!"}
-	
+
 	# Consume energy
 	Global.resources.energy -= jump_cost
 	current_system_index = system_index
