@@ -39,6 +39,12 @@ var _rng_encounters: RandomNumberGenerator = RandomNumberGenerator.new()
 # 1/4 - 1/5 ≈ 0.20 - 0.25
 @export var enemy_spawn_chance: float = 0.22
 
+# ✅ Connection tuning
+@export var connect_max_distance: float = 45.0
+@export var max_neighbors_per_system: int = 3
+@export var extra_connection_chance: float = 0.18 # shortcuts
+@export_range(0.0, 0.6, 0.05) var dead_end_ratio: float = 0.25 # want some degree-1 nodes
+
 const MODEL_PATH := "res://kenney_space-kit/Models/GLTF format/"
 
 func _ready() -> void:
@@ -166,14 +172,8 @@ func generate_map_3d() -> void:
 		add_child(star_mesh)
 		system_meshes.append(star_mesh)
 
-	# Connections
-	for i in range(systems.size()):
-		for j in range(i + 1, systems.size()):
-			var a: Vector3 = systems[i]["position"]
-			var b: Vector3 = systems[j]["position"]
-			if a.distance_to(b) < 45.0:
-				connections.append([i, j])
-				_draw_connection(a, b)
+	# ✅ NEW: Connection graph generation (interesting paths)
+	_build_connections_graph()
 
 	_create_mothership_mesh()
 	_create_starfield()
@@ -181,6 +181,160 @@ func generate_map_3d() -> void:
 	# initial visual state
 	update_selection_visuals()
 
+
+# ----------------------------
+# Connection graph (MST + extras + dead ends)
+# ----------------------------
+
+func _build_connections_graph() -> void:
+	connections.clear()
+	if systems.size() <= 1:
+		return
+
+	# Precompute all candidate edges under distance limit
+	var edges: Array = []
+	for i in range(systems.size()):
+		for j in range(i + 1, systems.size()):
+			var a: Vector3 = systems[i]["position"]
+			var b: Vector3 = systems[j]["position"]
+			var d := a.distance_to(b)
+			if d <= connect_max_distance:
+				edges.append({"i": i, "j": j, "d": d})
+
+	# Fallback: if too sparse, loosen constraint once (prevents disconnected graphs)
+	if edges.size() == 0:
+		for i2 in range(systems.size()):
+			for j2 in range(i2 + 1, systems.size()):
+				var a2: Vector3 = systems[i2]["position"]
+				var b2: Vector3 = systems[j2]["position"]
+				var d2 := a2.distance_to(b2)
+				edges.append({"i": i2, "j": j2, "d": d2})
+
+	# Sort by distance (for MST / cheap edges)
+	edges.sort_custom(func(a, b): return float(a["d"]) < float(b["d"]))
+
+	# Degree tracking
+	var degree: Array[int] = []
+	degree.resize(systems.size())
+	for k in range(degree.size()):
+		degree[k] = 0
+
+	# Union-Find parent array
+	var parent: Array[int] = []
+	parent.resize(systems.size())
+	for p in range(parent.size()):
+		parent[p] = p
+
+	# --- Build MST ---
+	var mst_edges: Array = []
+	for e in edges:
+		var i3 := int(e["i"])
+		var j3 := int(e["j"])
+		if _uf_unite(parent, i3, j3):
+			mst_edges.append(e)
+			degree[i3] += 1
+			degree[j3] += 1
+			if mst_edges.size() == systems.size() - 1:
+				break
+
+	# If still not connected (rare), force-connect with nearest edges
+	if mst_edges.size() < systems.size() - 1:
+		for e2 in edges:
+			var a_idx := int(e2["i"])
+			var b_idx := int(e2["j"])
+			if _uf_unite(parent, a_idx, b_idx):
+				mst_edges.append(e2)
+				degree[a_idx] += 1
+				degree[b_idx] += 1
+				if mst_edges.size() == systems.size() - 1:
+					break
+
+	# Add MST edges (always)
+	for e3 in mst_edges:
+		_add_connection(int(e3["i"]), int(e3["j"]))
+
+	# Dead-end preference
+	var target_dead_ends := int(round(float(systems.size()) * dead_end_ratio))
+
+	# --- Add extra edges (shortcuts) but limit per node ---
+	for e4 in edges:
+		if _rng_layout.randf() > extra_connection_chance:
+			continue
+
+		var a2_idx := int(e4["i"])
+		var b2_idx := int(e4["j"])
+
+		# already connected?
+		if is_system_connected(a2_idx, b2_idx):
+			continue
+
+		# Respect max neighbors
+		if degree[a2_idx] >= max_neighbors_per_system:
+			continue
+		if degree[b2_idx] >= max_neighbors_per_system:
+			continue
+
+		# Prefer leaving some degree-1 systems as dead ends
+		var current_dead_ends := 0
+		for dval in degree:
+			if dval <= 1:
+				current_dead_ends += 1
+
+		if current_dead_ends < target_dead_ends:
+			if degree[a2_idx] <= 1 or degree[b2_idx] <= 1:
+				continue
+
+		_add_connection(a2_idx, b2_idx)
+		degree[a2_idx] += 1
+		degree[b2_idx] += 1
+
+	# Draw lines (based on `connections`)
+	for c in connections:
+		var ia: int = int(c[0])
+		var ib: int = int(c[1])
+		_draw_connection(systems[ia]["position"], systems[ib]["position"])
+
+
+func _add_connection(i: int, j: int) -> void:
+	# normalize order to reduce duplicates
+	var a := mini(i, j)
+	var b := maxi(i, j)
+	for conn in connections:
+		if int(conn[0]) == a and int(conn[1]) == b:
+			return
+	connections.append([a, b])
+
+
+# ----------------------------
+# Union-Find helpers (Godot-safe, no local lambdas)
+# ----------------------------
+
+func _uf_find(parent: Array[int], x: int) -> int:
+	var r := x
+	while parent[r] != r:
+		r = parent[r]
+
+	# path compression
+	var y := x
+	while parent[y] != y:
+		var nxt := parent[y]
+		parent[y] = r
+		y = nxt
+
+	return r
+
+func _uf_unite(parent: Array[int], a: int, b: int) -> bool:
+	var ra := _uf_find(parent, a)
+	var rb := _uf_find(parent, b)
+	if ra == rb:
+		return false
+	parent[rb] = ra
+	return true
+
+
+# ----------------------------
+# Starfield / Ship
+# ----------------------------
 
 func _create_starfield() -> void:
 	var star_count: int = 600

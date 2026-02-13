@@ -49,6 +49,7 @@ extends Node
 @onready var _ui_fabricator: Control = $UI/Control/Fabricator
 @onready var _ui_info_panel: Control = $UI/Control/InfoPanel
 
+
 func _ready():
 	# Connect signals
 	turn_manager.phase_changed.connect(_on_phase_changed)
@@ -94,12 +95,39 @@ func _ready():
 		galaxy_map.mothership_node = mothership
 		galaxy_map.generate_map_3d()
 
+		# ✅ Auto-focus at game start (after nodes are ready)
+		call_deferred("_focus_camera_on_start")
+
 	# ✅ Runtime combat UI + runtime battle log (no new files)
 	_setup_combat_ui()
 	_setup_battle_log_ui()
 
 	_on_phase_changed(turn_manager.current_phase)
 	update_ui()
+
+
+# ✅ NEW: start camera focus on mothership / current system
+func _focus_camera_on_start() -> void:
+	if not has_node("CameraPivot"):
+		return
+
+	var pivot = get_node("CameraPivot")
+	if pivot == null or not pivot.has_method("focus_on"):
+		return
+
+	# Prefer mothership mesh position (3D model in GalaxyMap3D)
+	if galaxy_map and ("mothership_mesh" in galaxy_map) and galaxy_map.mothership_mesh:
+		pivot.focus_on(galaxy_map.mothership_mesh.global_position)
+		return
+
+	# Fallback: focus current system
+	if galaxy_map and ("systems" in galaxy_map):
+		var cur: int = int(mothership.get_current_system())
+		if cur >= 0 and cur < galaxy_map.systems.size():
+			var sys = galaxy_map.systems[cur]
+			if sys and ("position" in sys):
+				pivot.focus_on(sys.position)
+
 
 func _show_info(drone_id: String):
 	var drone = Global.get_drone_by_id(drone_id)
