@@ -568,6 +568,111 @@ func _create_mothership_mesh() -> void:
 		mothership_mesh = fallback
 
 # ----------------------------
+# ✅ NEW: Mothership click helpers (visual center + approx radius)
+# ----------------------------
+
+# Returns a world position that matches the VISUAL center of the mothership model
+func get_mothership_click_world_pos() -> Vector3:
+	if mothership_mesh == null or !is_instance_valid(mothership_mesh):
+		return Vector3.ZERO
+
+	var found := false
+	var min_v := Vector3.INF
+	var max_v := -Vector3.INF
+
+	# collect all MeshInstance3D AABBs into mothership LOCAL space
+	var meshes: Array = mothership_mesh.find_children("*", "MeshInstance3D", true, false)
+	for m in meshes:
+		var mi := m as MeshInstance3D
+		if mi == null or !is_instance_valid(mi) or mi.mesh == null:
+			continue
+
+		var aabb: AABB = mi.get_aabb() # local to the MeshInstance3D
+		if aabb.size == Vector3.ZERO:
+			continue
+
+		# take the 8 corners of the AABB, transform into mothership local, then merge
+		var corners := [
+			aabb.position,
+			aabb.position + Vector3(aabb.size.x, 0, 0),
+			aabb.position + Vector3(0, aabb.size.y, 0),
+			aabb.position + Vector3(0, 0, aabb.size.z),
+			aabb.position + Vector3(aabb.size.x, aabb.size.y, 0),
+			aabb.position + Vector3(aabb.size.x, 0, aabb.size.z),
+			aabb.position + Vector3(0, aabb.size.y, aabb.size.z),
+			aabb.position + aabb.size
+		]
+
+		for c in corners:
+			var world_p: Vector3 = mi.global_transform * c
+			var local_p: Vector3 = mothership_mesh.to_local(world_p)
+			if !found:
+				min_v = local_p
+				max_v = local_p
+				found = true
+			else:
+				min_v = min_v.min(local_p)
+				max_v = max_v.max(local_p)
+
+	if !found:
+		return mothership_mesh.global_position
+
+	var center_local: Vector3 = (min_v + max_v) * 0.5
+	return mothership_mesh.to_global(center_local)
+
+# Approximate mothership "radius" in world units (used to scale click radius)
+func get_mothership_click_radius_world() -> float:
+	if mothership_mesh == null or !is_instance_valid(mothership_mesh):
+		return 1.0
+
+	var found := false
+	var min_v := Vector3.INF
+	var max_v := -Vector3.INF
+
+	var meshes: Array = mothership_mesh.find_children("*", "MeshInstance3D", true, false)
+	for m in meshes:
+		var mi := m as MeshInstance3D
+		if mi == null or !is_instance_valid(mi) or mi.mesh == null:
+			continue
+
+		var aabb: AABB = mi.get_aabb()
+		if aabb.size == Vector3.ZERO:
+			continue
+
+		var corners := [
+			aabb.position,
+			aabb.position + Vector3(aabb.size.x, 0, 0),
+			aabb.position + Vector3(0, aabb.size.y, 0),
+			aabb.position + Vector3(0, 0, aabb.size.z),
+			aabb.position + Vector3(aabb.size.x, aabb.size.y, 0),
+			aabb.position + Vector3(aabb.size.x, 0, aabb.size.z),
+			aabb.position + Vector3(0, aabb.size.y, aabb.size.z),
+			aabb.position + aabb.size
+		]
+
+		for c in corners:
+			var world_p: Vector3 = mi.global_transform * c
+			var local_p: Vector3 = mothership_mesh.to_local(world_p)
+			if !found:
+				min_v = local_p
+				max_v = local_p
+				found = true
+			else:
+				min_v = min_v.min(local_p)
+				max_v = max_v.max(local_p)
+
+	if !found:
+		return 1.0
+
+	# world radius approx = half of diagonal length of bounds
+	var diag_local: Vector3 = max_v - min_v
+	var r_local: float = diag_local.length() * 0.5
+	# convert roughly to world scale: multiply by average axis scale
+	var s: Vector3 = mothership_mesh.global_transform.basis.get_scale()
+	var s_avg: float = (absf(s.x) + absf(s.y) + absf(s.z)) / 3.0
+	return maxf(0.01, r_local * s_avg)
+
+# ----------------------------
 # Selection visuals
 # ----------------------------
 

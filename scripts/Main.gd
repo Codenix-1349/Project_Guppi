@@ -48,7 +48,6 @@ extends Node
 @onready var _ui_fabricator: Control = $UI/Control/Fabricator
 @onready var _ui_info_panel: Control = $UI/Control/InfoPanel
 
-
 func _ready():
 	# Connect signals
 	turn_manager.phase_changed.connect(_on_phase_changed)
@@ -94,7 +93,7 @@ func _ready():
 		galaxy_map.mothership_node = mothership
 		galaxy_map.generate_map_3d()
 
-		# ✅ NEW: Apply random start system (if GalaxyMap3D provides it)
+		# ✅ Apply random start system (if GalaxyMap3D provides it)
 		_apply_random_start_system_if_available()
 
 		# ✅ Auto-focus at game start (after nodes are ready)
@@ -107,8 +106,7 @@ func _ready():
 	_on_phase_changed(turn_manager.current_phase)
 	update_ui()
 
-
-# ✅ NEW: Apply random start system coming from GalaxyMap3D
+# ✅ Apply random start system coming from GalaxyMap3D
 func _apply_random_start_system_if_available() -> void:
 	if galaxy_map == null:
 		return
@@ -122,7 +120,6 @@ func _apply_random_start_system_if_available() -> void:
 		if mothership.has_method("set_current_system"):
 			mothership.set_current_system(start_idx)
 		else:
-			# fallback: your Mothership has current_system_index in the file you pasted
 			mothership.current_system_index = start_idx
 			if mothership.has_signal("system_changed"):
 				mothership.emit_signal("system_changed", start_idx)
@@ -133,8 +130,7 @@ func _apply_random_start_system_if_available() -> void:
 		galaxy_map.selected_planet_index = -1
 		galaxy_map.update_selection_visuals()
 
-
-# ✅ NEW: start camera focus on mothership / current system
+# ✅ start camera focus on mothership / current system
 func _focus_camera_on_start() -> void:
 	if not has_node("CameraPivot"):
 		return
@@ -155,7 +151,6 @@ func _focus_camera_on_start() -> void:
 			var sys = galaxy_map.systems[cur]
 			if sys and ("position" in sys):
 				pivot.focus_on(sys.position)
-
 
 func _show_info(drone_id: String):
 	var drone = Global.get_drone_by_id(drone_id)
@@ -506,6 +501,34 @@ func _unhandled_input(event):
 	if has_node("GalaxyMap3D") and event is InputEventMouseButton and event.pressed and event.button_index == MOUSE_BUTTON_LEFT:
 		_process_3d_selection(event.position, event.double_click)
 
+# ✅ NEW: dynamic click radius (pixels) based on camera distance + FOV + mothership size
+func _mothership_click_radius_px(cam: Camera3D, ms_world_pos: Vector3) -> float:
+	if cam == null:
+		return 50.0
+
+	var viewport_h: float = float(get_viewport().get_visible_rect().size.y)
+	var dist: float = cam.global_position.distance_to(ms_world_pos)
+	dist = maxf(dist, 0.01)
+
+	# approximate object radius in world units
+	var r_world: float = 2.0
+	if galaxy_map and galaxy_map.has_method("get_mothership_click_radius_world"):
+		r_world = float(galaxy_map.get_mothership_click_radius_world())
+
+	# perspective projection: pixels_per_world_at_dist ≈ H / (2*tan(fov/2) * dist)
+	var fov_rad: float = deg_to_rad(cam.fov)
+	var denom: float = 2.0 * tan(fov_rad * 0.5) * dist
+	denom = maxf(denom, 0.0001)
+
+	var px_per_world: float = viewport_h / denom
+	var r_px: float = r_world * px_per_world
+
+	# clamp to keep UX stable
+	r_px = clamp(r_px, 28.0, 110.0)
+
+	# little UX bias: easier to click mothership
+	return r_px * 1.15
+
 func _process_3d_selection(mouse_pos, is_double_click = false):
 	var cam = get_node("CameraPivot/Camera3D")
 	if not cam:
@@ -515,10 +538,14 @@ func _process_3d_selection(mouse_pos, is_double_click = false):
 
 	# 1) Mothership
 	if galaxy_map.mothership_mesh:
-		var ms_pos = galaxy_map.mothership_mesh.global_position
+		var ms_pos: Vector3 = galaxy_map.mothership_mesh.global_position
+		if galaxy_map.has_method("get_mothership_click_world_pos"):
+			ms_pos = galaxy_map.get_mothership_click_world_pos()
+
 		var ms_screen = cam.unproject_position(ms_pos)
 		if not cam.is_position_behind(ms_pos):
-			if mouse_pos.distance_to(ms_screen) < 50.0:
+			var r_px: float = _mothership_click_radius_px(cam, ms_pos)
+			if mouse_pos.distance_to(ms_screen) < r_px:
 				galaxy_map.selected_system_index = -2
 				galaxy_map.update_selection_visuals()
 				update_ui()
@@ -584,7 +611,6 @@ func _process_3d_selection(mouse_pos, is_double_click = false):
 	galaxy_map.selected_planet_index = -1
 	galaxy_map.update_selection_visuals()
 	update_ui()
-
 
 # ---------------------------
 # RUNTIME COMBAT UI (no new files)
