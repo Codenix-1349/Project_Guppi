@@ -7,9 +7,9 @@ Ein rundenbasiertes Strategiespiel entwickelt mit der Godot Engine. Übernimm da
 *   **Galaxien-Erkundung**: Navigiere durch ein vernetztes System von Sternen in 2D- oder 3D-Ansichten.
 *   **Ressourcen-Management**: Sammle Eisen (FE), Titan (TI) und Uran (U) sowie Forschungsdaten. Verwalte deine Energie für Jumps und Scans.
 *   **Drohnen-Fabrikator**: Baue spezialisierte Einheiten:
-    *   **Scouts**: Sonden für die Fernerkundung entfernter Systeme.
-    *   **Miner**: Einheiten zur automatisierten Ressourcengewinnung auf Planeten.
-    *   **Defenders**: Kampfstarke Drohnen zum Schutz deiner Flotte.
+	*   **Scouts**: Sonden für die Fernerkundung entfernter Systeme.
+	*   **Miner**: Einheiten zur automatisierten Ressourcengewinnung auf Planeten.
+	*   **Defenders**: Kampfstarke Drohnen zum Schutz deiner Flotte.
 *   **Kampfsystem**: Automatische Gefechtsabwicklung gegen verschiedene Gegnertypen (Swarm, Corsair, Fortress).
 *   **Fortschritt**: Steige im Level auf, um deine Energiekapazität zu erhöhen und neue Möglichkeiten freizuschalten.
 *   **Überlebenskampf**: Achte auf die Integrität deiner Schiffshülle (HP). Ohne Schutz zerfällt dein Schiff unter feindlichem Beschuss.
