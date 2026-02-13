@@ -19,6 +19,10 @@ run/main_scene="res://scenes/Main3D.tscn"
 config/features=PackedStringArray("4.6", "Forward Plus")
 config/icon="res://icon.svg"
 
+[audio]
+
+buses/default_bus_layout="uid://bg8wrp2x05f7n"
+
 [autoload]
 
 Global="*res://scripts/Global.gd"
