@@ -1,3 +1,4 @@
+# === scripts/GalaxyMap3D.gd ===
 extends Node3D
 class_name GalaxyMap3D
 
@@ -78,6 +79,10 @@ var start_system_index: int = 0
 
 const MODEL_PATH := "res://kenney_space-kit/Models/GLTF format/"
 
+# ✅ Pick layer for raycast selection (must match Main.gd query mask)
+const PICK_LAYER_BIT := 10
+const PICK_LAYER_MASK := 1 << PICK_LAYER_BIT
+
 # ----------------------------
 # Lifecycle
 # ----------------------------
@@ -119,6 +124,120 @@ func _clear_generated_nodes() -> void:
 	_planet_ring_nodes.clear()
 	_planet_noise_cache.clear()
 	_planet_material_cache.clear()
+
+# ----------------------------
+# ✅ PICK HELPERS (Raycast selection)
+# ----------------------------
+
+func _get_combined_local_aabb(root: Node) -> AABB:
+	var have: bool = false
+	var combined: AABB = AABB()
+
+	# Walk tree
+	for n in root.get_children():
+		if n is Node:
+			var child_aabb: AABB = _get_combined_local_aabb(n)
+			if child_aabb.size != Vector3.ZERO:
+				if not have:
+					combined = child_aabb
+					have = true
+				else:
+					combined = combined.merge(child_aabb)
+
+		if n is MeshInstance3D:
+			var mi: MeshInstance3D = n as MeshInstance3D
+			if mi.mesh == null:
+				continue
+
+			var aabb: AABB = mi.mesh.get_aabb()
+			var xf: Transform3D = mi.transform
+
+			var corners: Array = [
+				aabb.position,
+				aabb.position + Vector3(aabb.size.x, 0, 0),
+				aabb.position + Vector3(0, aabb.size.y, 0),
+				aabb.position + Vector3(0, 0, aabb.size.z),
+				aabb.position + Vector3(aabb.size.x, aabb.size.y, 0),
+				aabb.position + Vector3(aabb.size.x, 0, aabb.size.z),
+				aabb.position + Vector3(0, aabb.size.y, aabb.size.z),
+				aabb.position + aabb.size
+			]
+
+			var have2: bool = false
+			var a2: AABB = AABB()
+			for c in corners:
+				# ✅ explicit typing -> fixes "Cannot infer type of 'p'"
+				var p: Vector3 = xf * (c as Vector3)
+				if not have2:
+					a2 = AABB(p, Vector3(0.001, 0.001, 0.001))
+					have2 = true
+				else:
+					a2 = a2.expand(p)
+
+			if not have:
+				combined = a2
+				have = true
+			else:
+				combined = combined.merge(a2)
+
+	return combined if have else AABB(Vector3.ZERO, Vector3.ZERO)
+
+func _attach_pick_box(target: Node3D, pick_type: String) -> void:
+	if target == null:
+		return
+
+	# remove old
+	if target.has_node("PickArea"):
+		target.get_node("PickArea").queue_free()
+
+	var aabb: AABB = _get_combined_local_aabb(target)
+	if aabb.size == Vector3.ZERO:
+		aabb = AABB(Vector3(-0.5, -0.5, -0.5), Vector3(1, 1, 1))
+
+	# slight padding
+	var pad := 0.12
+	aabb.position -= Vector3(pad, pad, pad)
+	aabb.size += Vector3(pad * 2, pad * 2, pad * 2)
+
+	var area := Area3D.new()
+	area.name = "PickArea"
+	area.set_meta("pick_type", pick_type)
+	area.collision_layer = PICK_LAYER_MASK
+	area.collision_mask = 0
+
+	var cs := CollisionShape3D.new()
+	var box := BoxShape3D.new()
+	box.size = aabb.size
+	cs.shape = box
+	cs.position = aabb.position + aabb.size * 0.5
+
+	area.add_child(cs)
+	target.add_child(area)
+
+func _attach_pick_sphere(target: Node3D, radius: float, pick_type: String, meta: Dictionary) -> void:
+	if target == null:
+		return
+
+	if target.has_node("PickArea"):
+		target.get_node("PickArea").queue_free()
+
+	var area := Area3D.new()
+	area.name = "PickArea"
+	area.set_meta("pick_type", pick_type)
+
+	for k in meta.keys():
+		area.set_meta(k, meta[k])
+
+	area.collision_layer = PICK_LAYER_MASK
+	area.collision_mask = 0
+
+	var cs := CollisionShape3D.new()
+	var sph := SphereShape3D.new()
+	sph.radius = maxf(0.01, radius)
+	cs.shape = sph
+
+	area.add_child(cs)
+	target.add_child(area)
 
 # ----------------------------
 # Map generation
@@ -190,6 +309,9 @@ func generate_map_3d() -> void:
 		star_mesh.set_meta("system_index", i)
 		add_child(star_mesh)
 		system_meshes.append(star_mesh)
+
+		# ✅ Pick sphere for stars (raycast)
+		_attach_pick_sphere(star_mesh, sm.radius * 1.15, "system", {"system_index": i})
 
 	# connections first (so we have a good spread)
 	_generate_connections()
@@ -567,110 +689,8 @@ func _create_mothership_mesh() -> void:
 		add_child(fallback)
 		mothership_mesh = fallback
 
-# ----------------------------
-# ✅ NEW: Mothership click helpers (visual center + approx radius)
-# ----------------------------
-
-# Returns a world position that matches the VISUAL center of the mothership model
-func get_mothership_click_world_pos() -> Vector3:
-	if mothership_mesh == null or !is_instance_valid(mothership_mesh):
-		return Vector3.ZERO
-
-	var found := false
-	var min_v := Vector3.INF
-	var max_v := -Vector3.INF
-
-	# collect all MeshInstance3D AABBs into mothership LOCAL space
-	var meshes: Array = mothership_mesh.find_children("*", "MeshInstance3D", true, false)
-	for m in meshes:
-		var mi := m as MeshInstance3D
-		if mi == null or !is_instance_valid(mi) or mi.mesh == null:
-			continue
-
-		var aabb: AABB = mi.get_aabb() # local to the MeshInstance3D
-		if aabb.size == Vector3.ZERO:
-			continue
-
-		# take the 8 corners of the AABB, transform into mothership local, then merge
-		var corners := [
-			aabb.position,
-			aabb.position + Vector3(aabb.size.x, 0, 0),
-			aabb.position + Vector3(0, aabb.size.y, 0),
-			aabb.position + Vector3(0, 0, aabb.size.z),
-			aabb.position + Vector3(aabb.size.x, aabb.size.y, 0),
-			aabb.position + Vector3(aabb.size.x, 0, aabb.size.z),
-			aabb.position + Vector3(0, aabb.size.y, aabb.size.z),
-			aabb.position + aabb.size
-		]
-
-		for c in corners:
-			var world_p: Vector3 = mi.global_transform * c
-			var local_p: Vector3 = mothership_mesh.to_local(world_p)
-			if !found:
-				min_v = local_p
-				max_v = local_p
-				found = true
-			else:
-				min_v = min_v.min(local_p)
-				max_v = max_v.max(local_p)
-
-	if !found:
-		return mothership_mesh.global_position
-
-	var center_local: Vector3 = (min_v + max_v) * 0.5
-	return mothership_mesh.to_global(center_local)
-
-# Approximate mothership "radius" in world units (used to scale click radius)
-func get_mothership_click_radius_world() -> float:
-	if mothership_mesh == null or !is_instance_valid(mothership_mesh):
-		return 1.0
-
-	var found := false
-	var min_v := Vector3.INF
-	var max_v := -Vector3.INF
-
-	var meshes: Array = mothership_mesh.find_children("*", "MeshInstance3D", true, false)
-	for m in meshes:
-		var mi := m as MeshInstance3D
-		if mi == null or !is_instance_valid(mi) or mi.mesh == null:
-			continue
-
-		var aabb: AABB = mi.get_aabb()
-		if aabb.size == Vector3.ZERO:
-			continue
-
-		var corners := [
-			aabb.position,
-			aabb.position + Vector3(aabb.size.x, 0, 0),
-			aabb.position + Vector3(0, aabb.size.y, 0),
-			aabb.position + Vector3(0, 0, aabb.size.z),
-			aabb.position + Vector3(aabb.size.x, aabb.size.y, 0),
-			aabb.position + Vector3(aabb.size.x, 0, aabb.size.z),
-			aabb.position + Vector3(0, aabb.size.y, aabb.size.z),
-			aabb.position + aabb.size
-		]
-
-		for c in corners:
-			var world_p: Vector3 = mi.global_transform * c
-			var local_p: Vector3 = mothership_mesh.to_local(world_p)
-			if !found:
-				min_v = local_p
-				max_v = local_p
-				found = true
-			else:
-				min_v = min_v.min(local_p)
-				max_v = max_v.max(local_p)
-
-	if !found:
-		return 1.0
-
-	# world radius approx = half of diagonal length of bounds
-	var diag_local: Vector3 = max_v - min_v
-	var r_local: float = diag_local.length() * 0.5
-	# convert roughly to world scale: multiply by average axis scale
-	var s: Vector3 = mothership_mesh.global_transform.basis.get_scale()
-	var s_avg: float = (absf(s.x) + absf(s.y) + absf(s.z)) / 3.0
-	return maxf(0.01, r_local * s_avg)
+	# ✅ Pick box for mothership (fits model AABB)
+	_attach_pick_box(mothership_mesh, "mothership")
 
 # ----------------------------
 # Selection visuals
@@ -750,6 +770,9 @@ func _ensure_active_planets() -> void:
 
 				add_child(planet_node)
 				(planet_meshes[sys_idx2] as Array).append(planet_node)
+
+				# ✅ Pick sphere for planets
+				_attach_pick_sphere(planet_node, 0.4 * 1.25, "planet", {"system_index": sys_idx2, "planet_index": p_idx})
 
 				_draw_orbit_path(sys_idx2, float(p_data["orbit_radius"]))
 

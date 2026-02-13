@@ -1,3 +1,4 @@
+# === scripts/Main.gd ===
 extends Node
 
 @onready var turn_manager = $Managers/TurnManager
@@ -47,6 +48,10 @@ extends Node
 @onready var _ui_printer_status: Control = $UI/Control/PrinterStatus
 @onready var _ui_fabricator: Control = $UI/Control/Fabricator
 @onready var _ui_info_panel: Control = $UI/Control/InfoPanel
+
+# ✅ Must match GalaxyMap3D.gd pick layer
+const PICK_LAYER_BIT := 10
+const PICK_LAYER_MASK := 1 << PICK_LAYER_BIT
 
 
 func _ready():
@@ -108,7 +113,6 @@ func _ready():
 	update_ui()
 
 
-# ✅ Apply random start system coming from GalaxyMap3D
 func _apply_random_start_system_if_available() -> void:
 	if galaxy_map == null:
 		return
@@ -117,25 +121,20 @@ func _apply_random_start_system_if_available() -> void:
 	if "start_system_index" in galaxy_map:
 		start_idx = int(galaxy_map.start_system_index)
 
-	# Use mothership helper if present; fallback to direct property
 	if mothership != null:
 		if mothership.has_method("set_current_system"):
 			mothership.set_current_system(start_idx)
 		else:
-			# fallback: some mothership variants expose current_system_index
-			if "current_system_index" in mothership:
-				mothership.current_system_index = start_idx
+			mothership.current_system_index = start_idx
 			if mothership.has_signal("system_changed"):
 				mothership.emit_signal("system_changed", start_idx)
 
-	# Make selection visuals consistent at start
 	if galaxy_map.has_method("update_selection_visuals"):
 		galaxy_map.selected_system_index = -1
 		galaxy_map.selected_planet_index = -1
 		galaxy_map.update_selection_visuals()
 
 
-# ✅ start camera focus on mothership / current system
 func _focus_camera_on_start() -> void:
 	if not has_node("CameraPivot"):
 		return
@@ -144,12 +143,10 @@ func _focus_camera_on_start() -> void:
 	if pivot == null or not pivot.has_method("focus_on"):
 		return
 
-	# Prefer mothership mesh position (3D model in GalaxyMap3D)
 	if galaxy_map and ("mothership_mesh" in galaxy_map) and galaxy_map.mothership_mesh:
 		pivot.focus_on(galaxy_map.mothership_mesh.global_position)
 		return
 
-	# Fallback: focus current system
 	if galaxy_map and ("systems" in galaxy_map):
 		var cur: int = int(mothership.get_current_system())
 		if cur >= 0 and cur < galaxy_map.systems.size():
@@ -167,12 +164,15 @@ func _show_info(drone_id: String):
 		var build_time = drone.get("build_time", 2)
 		info_label.text = drone.name + " (" + str(build_time) + " Runden) [" + cost_text + "]\n" + drone.description
 
+
 func _hide_info():
 	info_label.text = "Hover over a unit to see details..."
+
 
 func _show_jump_info():
 	var cost = mothership.jump_cost
 	info_label.text = "JUMP DRIVE [Energie: " + str(cost) + "]\nBereite einen Sprung in ein benachbartes System vor."
+
 
 func _on_deploy_miner_pressed():
 	var current_idx = mothership.get_current_system()
@@ -194,6 +194,7 @@ func _on_deploy_miner_pressed():
 		if galaxy_map and galaxy_map.has_method("update_selection_visuals"):
 			galaxy_map.update_selection_visuals()
 		update_ui()
+
 
 func _update_detailed_info():
 	if not galaxy_map:
@@ -286,6 +287,7 @@ func _update_detailed_info():
 
 		system_content.text = p_info
 
+
 func _on_print_scout(): _on_print_requested("scout_v1")
 func _on_print_miner(): _on_print_requested("miner_v1")
 func _on_print_defender(): _on_print_requested("defender_v1")
@@ -301,7 +303,6 @@ func _on_print_requested(drone_id: String):
 func _on_printer_updated():
 	update_ui()
 
-# Legacy combat log handler (kept)
 func _on_combat_occurred(report):
 	var status_text = "GEFECHT: "
 	match report.status:
@@ -503,88 +504,94 @@ func update_ui():
 	if Global.mothership_hp <= 0:
 		game_over_layer.visible = true
 
+
 func _unhandled_input(event):
 	if has_node("GalaxyMap3D") and event is InputEventMouseButton and event.pressed and event.button_index == MOUSE_BUTTON_LEFT:
-		_process_3d_selection(event.position, event.double_click)
+		_process_3d_selection((event as InputEventMouseButton).position, (event as InputEventMouseButton).double_click)
 
-func _process_3d_selection(mouse_pos, is_double_click = false):
-	var cam = get_node("CameraPivot/Camera3D")
-	if not cam:
+
+# ✅ Raycast-based selection (fixed: world access + types)
+func _process_3d_selection(mouse_pos: Vector2, is_double_click: bool = false) -> void:
+	var cam: Camera3D = get_node_or_null("CameraPivot/Camera3D")
+	if cam == null:
 		return
 
-	var s_idx = galaxy_map.selected_system_index
+	var origin: Vector3 = cam.project_ray_origin(mouse_pos)
+	var dir: Vector3 = cam.project_ray_normal(mouse_pos).normalized()
+	var to: Vector3 = origin + dir * 5000.0
 
-	# 1) Mothership
-	if galaxy_map.mothership_mesh:
-		var ms_pos = galaxy_map.mothership_mesh.global_position
-		var ms_screen = cam.unproject_position(ms_pos)
-		if not cam.is_position_behind(ms_pos):
-			if mouse_pos.distance_to(ms_screen) < 50.0:
-				galaxy_map.selected_system_index = -2
-				galaxy_map.update_selection_visuals()
-				update_ui()
-				if is_double_click:
-					get_node("CameraPivot").focus_on(ms_pos)
-				return
+	var query: PhysicsRayQueryParameters3D = PhysicsRayQueryParameters3D.create(origin, to)
+	query.collide_with_areas = true
+	query.collide_with_bodies = true
+	query.collision_mask = PICK_LAYER_MASK
 
-	# 2) Systems
-	for i in range(galaxy_map.system_meshes.size()):
-		var sys_mesh = galaxy_map.system_meshes[i]
-		var sys_pos = sys_mesh.global_position
-		var sys_screen = cam.unproject_position(sys_pos)
+	# ✅ IMPORTANT: Main.gd is Node, so use the camera/world, not self.get_world_3d()
+	var world: World3D = cam.get_world_3d()
+	if world == null:
+		return
+	var space: PhysicsDirectSpaceState3D = world.direct_space_state
 
-		if not cam.is_position_behind(sys_pos):
-			if mouse_pos.distance_to(sys_screen) < 40.0:
-				galaxy_map.selected_system_index = i
+	var hit: Dictionary = space.intersect_ray(query)
+
+	if hit.is_empty():
+		galaxy_map.selected_system_index = -1
+		galaxy_map.selected_planet_index = -1
+		galaxy_map.update_selection_visuals()
+		update_ui()
+		return
+
+	var col: Object = hit.get("collider", null)
+	if col == null:
+		return
+	if not (col is Node):
+		return
+
+	var n: Node = col as Node
+	var pick_type: String = str(n.get_meta("pick_type", ""))
+
+	match pick_type:
+		"mothership":
+			galaxy_map.selected_system_index = -2
+			galaxy_map.selected_planet_index = -1
+			galaxy_map.update_selection_visuals()
+			update_ui()
+			if is_double_click and galaxy_map.mothership_mesh:
+				get_node("CameraPivot").focus_on(galaxy_map.mothership_mesh.global_position)
+			return
+
+		"system":
+			var idx: int = int(n.get_meta("system_index", -1))
+			if idx >= 0:
+				galaxy_map.selected_system_index = idx
 				galaxy_map.selected_planet_index = -1
 				galaxy_map.update_selection_visuals()
 				update_ui()
-				if is_double_click:
+				if is_double_click and idx < galaxy_map.systems.size():
+					var sys_pos: Vector3 = galaxy_map.systems[idx]["position"]
 					get_node("CameraPivot").focus_on(sys_pos)
-				return
+			return
 
-	# 3) Planets
-	var active_sys_indices = []
-	active_sys_indices.append(mothership.get_current_system())
-	if s_idx != -1 and s_idx != active_sys_indices[0]:
-		active_sys_indices.append(s_idx)
+		"planet":
+			var s_idx: int = int(n.get_meta("system_index", -1))
+			var p_idx: int = int(n.get_meta("planet_index", -1))
+			if s_idx >= 0 and p_idx >= 0:
+				galaxy_map.selected_system_index = s_idx
+				galaxy_map.selected_planet_index = p_idx
+				galaxy_map.update_selection_visuals()
+				update_ui()
+				if is_double_click and galaxy_map.planet_meshes.has(s_idx):
+					var p_mesh = galaxy_map.planet_meshes[s_idx][p_idx]
+					if p_mesh:
+						get_node("CameraPivot").focus_on(p_mesh.global_position)
+			return
 
-	var closest_planet_idx = -1
-	var target_s_idx = -1
-	var min_p_dist = 25.0
+		_:
+			galaxy_map.selected_system_index = -1
+			galaxy_map.selected_planet_index = -1
+			galaxy_map.update_selection_visuals()
+			update_ui()
+			return
 
-	for check_s_idx in active_sys_indices:
-		if galaxy_map.systems[check_s_idx].scanned and galaxy_map.planet_meshes.has(check_s_idx):
-			for p_idx in range(galaxy_map.planet_meshes[check_s_idx].size()):
-				var p_mesh = galaxy_map.planet_meshes[check_s_idx][p_idx]
-				if not is_instance_valid(p_mesh):
-					continue
-
-				var screen_pos = cam.unproject_position(p_mesh.global_position)
-				if cam.is_position_behind(p_mesh.global_position):
-					continue
-
-				var dist = mouse_pos.distance_to(screen_pos)
-				if dist < min_p_dist:
-					closest_planet_idx = p_idx
-					target_s_idx = check_s_idx
-					min_p_dist = dist
-
-	if closest_planet_idx != -1:
-		galaxy_map.selected_system_index = target_s_idx
-		galaxy_map.selected_planet_index = closest_planet_idx
-		galaxy_map.update_selection_visuals()
-		update_ui()
-		if is_double_click:
-			var p_mesh2 = galaxy_map.planet_meshes[target_s_idx][closest_planet_idx]
-			get_node("CameraPivot").focus_on(p_mesh2.global_position)
-		return
-
-	# Clicked empty space - Deselect
-	galaxy_map.selected_system_index = -1
-	galaxy_map.selected_planet_index = -1
-	galaxy_map.update_selection_visuals()
-	update_ui()
 
 # ---------------------------
 # RUNTIME COMBAT UI (no new files)
@@ -608,9 +615,6 @@ var _battle_rich: RichTextLabel
 var _battle_toggle_btn: Button
 var _battle_collapsed: bool = true
 
-# ✅ Safe area so the battle log never covers the bottom action buttons
-const _BATTLELOG_SAFE_BOTTOM_PX := 96
-
 # track original UI visibility
 var _combat_mode_active: bool = false
 var _saved_vis: Dictionary = {}
@@ -627,7 +631,7 @@ func _set_combat_mode(active: bool) -> void:
 	if _ui_printer_status: nodes_to_toggle.append(_ui_printer_status)
 	if _ui_fabricator: nodes_to_toggle.append(_ui_fabricator)
 	if _ui_info_panel: nodes_to_toggle.append(_ui_info_panel)
-	if combat_log: nodes_to_toggle.append(combat_log) # avoid double messages behind panel
+	if combat_log: nodes_to_toggle.append(combat_log)
 
 	if active:
 		_saved_vis.clear()
@@ -788,13 +792,12 @@ func _setup_battle_log_ui():
 	_battle_panel.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	_battle_panel.z_index = 2000
 
-	# bottom-right
 	_battle_panel.anchor_left = 1.0
 	_battle_panel.anchor_top = 1.0
 	_battle_panel.anchor_right = 1.0
 	_battle_panel.anchor_bottom = 1.0
 	_battle_panel.offset_right = -16
-	_battle_panel.offset_bottom = -_BATTLELOG_SAFE_BOTTOM_PX  # ✅ NEVER cover bottom buttons
+	_battle_panel.offset_bottom = -16
 
 	var bg := StyleBoxFlat.new()
 	bg.bg_color = Color(0.02, 0.02, 0.03, 0.78)
@@ -842,10 +845,10 @@ func _setup_battle_log_ui():
 
 	_battle_rich = RichTextLabel.new()
 	_battle_rich.bbcode_enabled = true
-	_battle_rich.scroll_active = false            # ✅ ScrollContainer handles scrolling
-	_battle_rich.fit_content = true               # ✅ IMPORTANT: make content height real
+	_battle_rich.scroll_active = false
+	_battle_rich.fit_content = false
 	_battle_rich.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	_battle_rich.size_flags_vertical = Control.SIZE_SHRINK_BEGIN
+	_battle_rich.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	_battle_rich.text = ""
 	_battle_scroll.add_child(_battle_rich)
 
@@ -866,9 +869,6 @@ func _apply_battle_log_layout() -> void:
 	if _battle_panel == null:
 		return
 
-	# keep safe bottom offset always
-	_battle_panel.offset_bottom = -_BATTLELOG_SAFE_BOTTOM_PX
-
 	if _battle_collapsed:
 		_battle_toggle_btn.text = "Show"
 		_battle_scroll.visible = false
@@ -879,8 +879,8 @@ func _apply_battle_log_layout() -> void:
 	else:
 		_battle_toggle_btn.text = "Hide"
 		_battle_scroll.visible = true
-		var w: float = 520   # ✅ slightly narrower so it collides less often
-		var h: float = 320
+		var w: float = 560
+		var h: float = 300
 		_battle_panel.custom_minimum_size = Vector2(w, h)
 		_battle_panel.offset_left = -w
 		_battle_panel.offset_top = -h
@@ -898,33 +898,10 @@ func _update_battle_log_text(payload: Dictionary) -> void:
 	elif combat_manager and combat_manager.has_method("get_log_bb"):
 		log_bb = str(combat_manager.get_log_bb())
 
-	# ✅ always set text (even collapsed) so opening shows full history
 	_battle_rich.text = log_bb
 
-	# ✅ force ScrollContainer to recognize correct content height
-	call_deferred("_battlelog_refresh_content_size")
-
-	# auto scroll to bottom when expanded
 	if not _battle_collapsed:
 		call_deferred("_scroll_battle_log_to_bottom")
-
-func _battlelog_refresh_content_size() -> void:
-	if _battle_rich == null or _battle_scroll == null:
-		return
-
-	# Wait one frame so RichText computes layout
-	await get_tree().process_frame
-
-	var h: float = 0.0
-	if _battle_rich.has_method("get_content_height"):
-		h = float(_battle_rich.get_content_height())
-	else:
-		# fallback: try minimum size (less accurate but better than nothing)
-		h = float(_battle_rich.get_minimum_size().y)
-
-	# give ScrollContainer a real content height
-	if h > 0.0:
-		_battle_rich.custom_minimum_size = Vector2(0, h + 8)
 
 func _scroll_battle_log_to_bottom() -> void:
 	if _battle_scroll == null:
@@ -948,13 +925,9 @@ func _on_encounter_ui(payload: Dictionary):
 	_combat_fleet.text = str(payload.get("fleet_bb", ""))
 	_combat_enemy.text = str(payload.get("enemy_bb", ""))
 
-	# ✅ Battle log during combat
 	_set_battle_log_active(true)
-
-	# ✅ Auto-open once so you SEE it's working
 	_battle_collapsed = false
 	_apply_battle_log_layout()
-
 	_update_battle_log_text(payload)
 
 func _on_encounter_end(payload: Dictionary):
