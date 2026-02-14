@@ -1,6 +1,7 @@
 extends Node
 # CombatManager.gd (Godot 4.x strict-parse safe)
 # Combat with aggregated stacks + segmented HP bars + working battle log.
+# + Structured payload data for UI icons (fleet_units / enemy_units)
 
 signal encounter_started(payload: Dictionary)
 signal encounter_updated(payload: Dictionary)
@@ -398,6 +399,74 @@ func _pick_stack_weighted(stacks: Array) -> int:
 	return -1
 
 # -------------------------
+# ✅ Structured payload for UI
+# -------------------------
+
+func _build_fleet_units_payload() -> Array:
+	var out: Array = []
+
+	# mothership always first
+	out.append({
+		"id": "mothership",
+		"name": "Mutterschiff",
+		"count": 1,
+		"front_hp": int(Global.mothership_hp),
+		"max_hp": int(Global.max_mothership_hp),
+		"firepower_total": 0
+	})
+
+	for sv in _player_stacks:
+		if typeof(sv) != TYPE_DICTIONARY:
+			continue
+		var st: Dictionary = sv as Dictionary
+		var cnt: int = int(st.get("count", 0))
+		if cnt <= 0:
+			continue
+
+		var unit_hp: Array = (st["unit_hp"] as Array) if st.has("unit_hp") and typeof(st["unit_hp"]) == TYPE_ARRAY else []
+		var front_hp: int = int(unit_hp[0]) if unit_hp.size() > 0 else 0
+		var fp: int = int(st.get("firepower", 0))
+		var total_dmg: int = fp * cnt
+
+		out.append({
+			"id": str(st.get("id", "")),
+			"name": str(st.get("name", "Unit")),
+			"count": cnt,
+			"front_hp": front_hp,
+			"max_hp": int(st.get("max_hp", 1)),
+			"firepower_total": total_dmg
+		})
+
+	return out
+
+func _build_enemy_units_payload() -> Array:
+	var out: Array = []
+
+	for ev in _enemy_stacks:
+		if typeof(ev) != TYPE_DICTIONARY:
+			continue
+		var st: Dictionary = ev as Dictionary
+		var cnt: int = int(st.get("count", 0))
+		if cnt <= 0:
+			continue
+
+		var unit_hp: Array = (st["unit_hp"] as Array) if st.has("unit_hp") and typeof(st["unit_hp"]) == TYPE_ARRAY else []
+		var front_hp: int = int(unit_hp[0]) if unit_hp.size() > 0 else 0
+		var fp: int = int(st.get("firepower", 1))
+		var total_dmg: int = fp * cnt
+
+		out.append({
+			"id": str(st.get("id", "")),
+			"name": str(st.get("name", "Enemy")),
+			"count": cnt,
+			"front_hp": front_hp,
+			"max_hp": int(st.get("max_hp", 1)),
+			"firepower_total": total_dmg
+		})
+
+	return out
+
+# -------------------------
 # Rendering payload
 # -------------------------
 
@@ -406,7 +475,11 @@ func _emit_update(header: String) -> void:
 		"status": _build_status_bb(header),
 		"fleet_bb": _build_fleet_bb(),
 		"enemy_bb": _build_enemy_bb(),
-		"log_bb": get_log_bb()
+		"log_bb": get_log_bb(),
+
+		# ✅ structured (for UI icons)
+		"fleet_units": _build_fleet_units_payload(),
+		"enemy_units": _build_enemy_units_payload()
 	}
 
 	if _turn_in_encounter <= 0:
@@ -543,7 +616,9 @@ func _end_victory() -> void:
 		"status": _build_status_bb("ENCOUNTER ENDED"),
 		"fleet_bb": _build_fleet_bb(),
 		"enemy_bb": _build_enemy_bb(),
-		"log_bb": get_log_bb()
+		"log_bb": get_log_bb(),
+		"fleet_units": _build_fleet_units_payload(),
+		"enemy_units": _build_enemy_units_payload()
 	}
 	emit_signal("encounter_ended", payload)
 
@@ -564,7 +639,9 @@ func _end_flee() -> void:
 		"status": _build_status_bb("ENCOUNTER ENDED"),
 		"fleet_bb": _build_fleet_bb(),
 		"enemy_bb": _build_enemy_bb(),
-		"log_bb": get_log_bb()
+		"log_bb": get_log_bb(),
+		"fleet_units": _build_fleet_units_payload(),
+		"enemy_units": _build_enemy_units_payload()
 	}
 	emit_signal("encounter_ended", payload)
 
@@ -585,7 +662,9 @@ func _end_defeat(reason: String) -> void:
 		"status": _build_status_bb("ENCOUNTER ENDED"),
 		"fleet_bb": _build_fleet_bb(),
 		"enemy_bb": _build_enemy_bb(),
-		"log_bb": get_log_bb()
+		"log_bb": get_log_bb(),
+		"fleet_units": _build_fleet_units_payload(),
+		"enemy_units": _build_enemy_units_payload()
 	}
 	emit_signal("encounter_ended", payload)
 
