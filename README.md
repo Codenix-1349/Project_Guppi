@@ -1,122 +1,183 @@
-# Project Guppi - Deep Space Strategy
+# 🚀 Project Guppi – Deep Space Strategy  
+> Turn-based 3D space strategy prototype built with Godot 4 (GDScript · procedural systems · resource simulation)
 
-Ein rundenbasiertes Strategiespiel entwickelt mit der Godot Engine. Übernimm das Kommando über ein Mutterschiff, erkunde die Galaxie auf einer 3D Karte und überlebe in den Tiefen des Alls.
+<p align="left">
+  <img alt="Godot" title="Godot 4 Engine" height="34" style="margin-right:22px;"
+       src="https://raw.githubusercontent.com/github/explore/main/topics/godot/godot.png" />
+  <img alt="Game Development" title="Game Development" height="34" style="margin-right:22px;"
+       src="https://raw.githubusercontent.com/github/explore/main/topics/game-development/game-development.png" />
+</p>
 
-## 🖼️ Screenshots
+---
 
+## 📖 Overview
 
-#### Prozedurale Galaxie-Erkundung
-Jede neue Partie erschafft eine einzigartige dreidimensionale Sternenkarte mit unterschiedlichen Systemen, 
-Ressourcenverteilungen und Gefahren.
-Plane deine Route strategisch
-und entscheide, wohin dein Mutterschiff als Nächstes springt.
+**Project Guppi** is a turn-based 3D space strategy prototype developed using **Godot 4** and **GDScript**.
+
+The project focuses on:
+
+- Procedural galaxy generation  
+- Turn-based gameplay architecture  
+- Resource simulation systems  
+- Modular drone production  
+- Automated combat resolution  
+
+It demonstrates scalable system design, gameplay loop architecture and engine-level structuring within Godot.
+
+---
+
+## 🖼 Gameplay Preview
+
+### 🌌 Procedural Galaxy Generation
 
 <img
-  alt="Prozedurale Galaxie-Erkundung"
+  alt="Procedural Galaxy"
   src="https://github.com/user-attachments/assets/daafca8f-2579-4811-aa5f-6acf54eecbbc"
   width="900"
 />
 
+- Each session generates a unique 3D star map  
+- Dynamic resource distribution  
+- Connected star systems with range validation  
+- Scan-based discovery mechanics  
+
 ---
 
-#### Ressourcenabbau und Flottenausbau
-Schicke Miner auf Planeten, sichere Eisen, Titan und Uran und halte deine
-Produktionsketten am Laufen. Effizientes Ressourcenmanagement ist der
-Schlüssel zum Überleben im All.
+### ⛏ Resource Simulation & Drone Production
 
 <img
-  alt="Ressourcenabbau"
+  alt="Resource Simulation"
   src="https://github.com/user-attachments/assets/26a2d56f-8c36-4d6c-a7f5-732629a64329"
   width="900"
 />
 
+- Iron (FE), Titanium (TI), Uranium (U)  
+- Energy as strategic constraint  
+- Two-turn production cycle  
+- Passive resource extraction per round  
+
 ---
 
-#### Kampf gegen feindliche Alien-Fraktionen
-Feindkontakt. Stelle dich unterschiedlichen Gegnertypen und Schiffsklassen.
-Jede Begegnung fordert taktische Entscheidungen – kämpfen oder fliehen?
+### ⚔ Tactical Combat System
 
 <img
-  alt="Kampf gegen Aliens"
+  alt="Combat System"
   src="https://github.com/user-attachments/assets/f3f1d5bc-375c-44f5-b0e0-1a8149f44643"
   width="900"
 />
 
-
-
-## 🚀 Features
-
-*   **Galaxien-Erkundung**: Navigiere durch ein vernetztes System von Sternen in einer 3D-Ansicht.
-*   **Ressourcen-Management**: Sammle Eisen (FE), Titan (TI) und Uran (U) sowie Forschungsdaten. Verwalte deine Energie für Jumps und Scans.
-*   **Drohnen-Fabrikator**: Baue spezialisierte Einheiten:
-	*   **Scouts**: Sonden für die Fernerkundung entfernter Systeme.
-	*   **Miner**: Einheiten zur automatisierten Ressourcengewinnung auf Planeten.
-	*   **Defenders**: Kampfstarke Drohnen zum Schutz deiner Flotte.
-*   **Kampfsystem**: Automatische Gefechtsabwicklung gegen verschiedene Gegnertypen (Swarm, Corsair, Fortress).
-*   **Fortschritt**: Steige im Level auf, um deine Energiekapazität zu erhöhen und neue Möglichkeiten freizuschalten.
-*   **Überlebenskampf**: Achte auf die Integrität deiner Schiffshülle (HP). Ohne Schutz zerfällt dein Schiff unter feindlichem Beschuss.
-
-## 📖 Spielanleitung
-
-### 1. Die erste Erkundung
-Wähle ein System auf der Karte aus. Ist es noch unbekannt, kannst du es direkt scannen (verbraucht Energie) oder einen **Scout** dorthin schicken, falls das System in Reichweite deines Mutterschiffs (~800 Einheiten) liegt. Ein Scan enthüllt Ressourcenmengen auf Planeten und potenzielle Bedrohungen.
-
-### 2. Bergbau & Produktion
-Um zu überleben, brauchst du Ressourcen.
-*   Gehe zum **Fabricator** am unteren Bildschirmrand und baue einen Miner.
-*   Wähle nach Abschluss der Produktion (2 Runden) einen Planeten in einem gescannten System aus und klicke auf **"Assign Miner"**.
-*   Miner sammeln jede Runde passiv Ressourcen für dich.
-
-### 3. Fortbewegung
-Klicke auf ein verbundenes System und nutze den **"Jump"**-Button. Jumps verbrauchen Energie, bringen dich aber zu neuen Rohstoffen und Zielen.
-
-### 4. Rundenabschluss & Kampf
-Klicke auf **"End Turn"**, um die aktuelle Runde zu beenden. In dieser Phase geschehen drei Dinge:
-1.  Deine Miner sammeln Ressourcen.
-2.  Dein Fabricator stellt Drohnen fertig.
-3.  **Kampf**: Befindest du dich in einem System mit Gegnern, findet ein Gefecht statt. Deine Defenders greifen zuerst an. Besitzt du keine Drohnen, erleidet dein Mutterschiff direkt massiven Schaden an der Hülle!
-
-### 5. XP & Level Up
-Erfolgreiche Scans und gewonnene Kämpfe bringen dir XP. Bei einem Level-Up wird dein Energiespeicher erweitert und vollständig aufgefüllt.
+- Automated combat resolution  
+- Multiple enemy archetypes (Swarm, Corsair, Fortress)  
+- Defender-first strike mechanic  
+- Hull integrity (HP) as survival core variable  
 
 ---
 
-## 🛠️ Entwicklung & Voraussetzungen
+## ✨ Core Systems
 
-### Godot Engine
-Das Spiel benötigt die Godot Engine (getestet mit Version 4.x).
-*   [Godot Homepage](https://godotengine.org)
-*   [Download für Windows](https://godotengine.org/download/windows/)
-*   [Godot auf Steam](https://store.steampowered.com/app/404790/Godot_Engine/?l=german)
+### 🗺 Galaxy System
+- Procedural 3D map generation  
+- Energy-based scan mechanic  
+- Jump range validation (~800 units)  
+- Star system graph connections  
 
+### 🏗 Production System
+- Fabricator with production queue  
+- Specialized drone units:
+  - **Scouts** (exploration)
+  - **Miners** (resource extraction)
+  - **Defenders** (combat units)
 
-## 🎨 Grafik-Assets (Kenney Space Kit)
+### 🔄 Turn-Based Game Loop
+On **End Turn**:
+1. Resource extraction phase  
+2. Production completion  
+3. Combat resolution  
+4. XP evaluation & level check  
 
-Dieses Projekt nutzt das kostenlose **Kenney – Space Kit (CC0)**.
-
-Download (offizielle Quelle):
-https://kenney.nl/assets/space-kit
-
-### Installation
-
-1. Lade das Paket von Kenney herunter.
-2. Entpacke es.
-3. Lege die entpackten Asset-Dateien in diesen Ordner im Projekt:
-
-   `res://kenney_space-kit/`
-
-4. Godot neu öffnen (oder im Dateisystem einmal “Reload”).
-
-
-
-
-
-## 📚 Documentation
-
-- [Strategic Roadmap](docs/roadmap/Strategic_Roadmap.md)
-- [Game Design Document](docs/design/GDD.md)
-- [Technical Architecture](docs/technical/Technical_Architecture.md)
-
+### 📈 Progression System
+- XP gained from scans and combat  
+- Level-ups increase energy capacity  
+- Energy reset on level-up  
 
 ---
-*Viel Erfolg beim Überleben im Sektor, Commander!*
+
+## 🧠 Technical Architecture
+
+```
+GameManager
+  ├── GalaxyGenerator
+  ├── TurnManager
+  ├── CombatResolver
+  ├── FabricatorSystem
+  ├── ResourceManager
+  └── XPSystem
+```
+
+### Architectural Principles
+
+- Node-based modular structure  
+- Single-responsibility system components  
+- Centralized turn-state control  
+- Data-driven enemy configuration  
+- Designed for scalability (future sectors & factions)
+
+---
+
+## 🛠 Tech Stack
+
+| Area | Technology |
+|------|------------|
+| Engine | Godot 4.x |
+| Language | GDScript |
+| Architecture | Node-based Scene System |
+| Rendering | 3D |
+| Gameplay Model | Turn-Based Strategy |
+| Assets | Kenney Space Kit (CC0) |
+
+---
+
+## 🚀 Getting Started
+
+1. Install Godot 4.x  
+   https://godotengine.org  
+
+2. Clone repository
+
+```bash
+git clone https://github.com/Codenix-1349/Project_Guppi.git
+```
+
+3. Open the project in Godot  
+4. Run the main scene  
+
+---
+
+## 🎯 What This Project Demonstrates
+
+- Turn-based gameplay architecture  
+- Procedural content generation  
+- Resource simulation systems  
+- Combat resolution logic  
+- Modular system design  
+- Scalable game framework design  
+
+---
+
+## 📦 Planned Evolution
+
+- Sector-based difficulty scaling  
+- Faction diplomacy system  
+- Visual ship module upgrades  
+- Advanced enemy AI  
+- Save/Load system  
+- Steam build preparation  
+
+---
+
+## 👨‍💻 Author
+
+Patrick Neumann  
+
+GitHub: https://github.com/Codenix-1349  
+LinkedIn: https://linkedin.com/in/patrick-neumann-532367276  
