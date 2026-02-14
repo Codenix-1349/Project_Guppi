@@ -669,7 +669,7 @@ func _create_mothership_mesh() -> void:
 		mothership_mesh.queue_free()
 		mothership_mesh = null
 
-	var ship_scene = load(MODEL_PATH + "craft_cargoA.glb")
+	var ship_scene = load(MODEL_PATH + "craft_cargoB.glb")
 	if ship_scene:
 		mothership_mesh = (ship_scene as PackedScene).instantiate()
 		_tag_generated(mothership_mesh)
