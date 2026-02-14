@@ -48,6 +48,27 @@ Das Spiel benötigt die Godot Engine (getestet mit Version 4.x).
 *   [Godot auf Steam](https://store.steampowered.com/app/404790/Godot_Engine/?l=german)
 
 
+## 🎨 Grafik-Assets (Kenney Space Kit)
+
+Dieses Projekt nutzt das kostenlose **Kenney – Space Kit (CC0)**.
+
+Download (offizielle Quelle):
+https://kenney.nl/assets/space-kit
+
+### Installation
+
+1. Lade das Paket von Kenney herunter.
+2. Entpacke es.
+3. Lege die entpackten Asset-Dateien in diesen Ordner im Projekt:
+
+   `res://kenney_space-kit/`
+
+4. Godot neu öffnen (oder im Dateisystem einmal “Reload”).
+
+
+
+
+
 ## 📚 Documentation
 
 - [Strategic Roadmap](docs/roadmap/Strategic_Roadmap.md)
