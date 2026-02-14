@@ -1,13 +1,14 @@
 # Project Guppi - Deep Space Strategy
 
-Ein rundenbasiertes Strategiespiel entwickelt mit der Godot Engine. Übernimm das Kommando über ein Mutterschiff, erkunde die Galaxie und überlebe in den Tiefen des Alls.
+Ein rundenbasiertes Strategiespiel entwickelt mit der Godot Engine. Übernimm das Kommando über ein Mutterschiff, erkunde die Galaxie auf einer 3D Karte und überlebe in den Tiefen des Alls.
 
 ## 🖼️ Screenshots
 
 
 #### Prozedurale Galaxie-Erkundung
-Jede neue Partie erschafft eine einzigartige Sternenkarte mit unterschiedlichen
-Systemen, Ressourcenverteilungen und Gefahren. Plane deine Route strategisch
+Jede neue Partie erschafft eine einzigartige dreidimensionale Sternenkarte mit unterschiedlichen Systemen, 
+Ressourcenverteilungen und Gefahren.
+Plane deine Route strategisch
 und entscheide, wohin dein Mutterschiff als Nächstes springt.
 
 <img
