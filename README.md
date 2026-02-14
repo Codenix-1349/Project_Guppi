@@ -184,6 +184,18 @@ Place assets inside:
 res://kenney_space-kit/
 ```
 
+Example structure:
+
+```
+res/
+ ├── assets/
+ ├── audio/
+ ├── data/
+ ├── docs/
+ ├── kenney_space-kit/
+ └── scenes/
+```
+
 ---
 
 ## 🛣 Planned Features / Roadmap
