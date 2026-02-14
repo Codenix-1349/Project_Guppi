@@ -1,10 +1,10 @@
 # 🚀 Project Guppi – Deep Space Strategy  
-> Turn-based 3D space strategy prototype built with Godot 4 (GDScript · procedural systems · resource simulation)
+> Turn-based 3D space strategy prototype built with Godot 4 (GDScript · procedural systems · modular game architecture)
 
 <p align="left">
   <img alt="Godot" title="Godot 4 Engine" height="34" style="margin-right:22px;"
        src="https://raw.githubusercontent.com/github/explore/main/topics/godot/godot.png" />
-  <img alt="Game Development" title="Game Development" height="34" style="margin-right:22px;"
+  <img alt="Game Development" title="Game Development" height="34"
        src="https://raw.githubusercontent.com/github/explore/main/topics/game-development/game-development.png" />
 </p>
 
@@ -12,23 +12,25 @@
 
 ## 📖 Overview
 
-**Project Guppi** is a turn-based 3D space strategy prototype developed using **Godot 4** and **GDScript**.
+**Project Guppi** is a turn-based 3D strategy prototype developed with **Godot 4** and **GDScript**.
 
-The project focuses on:
+The project emphasizes:
 
 - Procedural galaxy generation  
-- Turn-based gameplay architecture  
-- Resource simulation systems  
-- Modular drone production  
+- Modular manager-based architecture  
+- Turn-based system orchestration  
+- Resource simulation  
+- Drone production systems  
 - Automated combat resolution  
+- Integrated battle logging  
 
-It demonstrates scalable system design, gameplay loop architecture and engine-level structuring within Godot.
+It demonstrates scalable game system design and structured scene architecture within the Godot engine.
 
 ---
 
 ## 🖼 Gameplay Preview
 
-### 🌌 Procedural Galaxy Generation
+### 🌌 Procedural Galaxy
 
 <img
   alt="Procedural Galaxy"
@@ -36,14 +38,14 @@ It demonstrates scalable system design, gameplay loop architecture and engine-le
   width="900"
 />
 
-- Each session generates a unique 3D star map  
-- Dynamic resource distribution  
-- Connected star systems with range validation  
-- Scan-based discovery mechanics  
+- Dynamic 3D star map generation  
+- Connected star systems  
+- Energy-based scanning  
+- Jump range validation  
 
 ---
 
-### ⛏ Resource Simulation & Drone Production
+### ⛏ Resource & Production Systems
 
 <img
   alt="Resource Simulation"
@@ -52,13 +54,14 @@ It demonstrates scalable system design, gameplay loop architecture and engine-le
 />
 
 - Iron (FE), Titanium (TI), Uranium (U)  
-- Energy as strategic constraint  
-- Two-turn production cycle  
-- Passive resource extraction per round  
+- Energy management as core constraint  
+- Fabricator production queue  
+- Miner assignment to planets  
+- Passive resource accumulation per turn  
 
 ---
 
-### ⚔ Tactical Combat System
+### ⚔ Combat & Battle Log
 
 <img
   alt="Combat System"
@@ -66,61 +69,71 @@ It demonstrates scalable system design, gameplay loop architecture and engine-le
   width="900"
 />
 
-- Automated combat resolution  
-- Multiple enemy archetypes (Swarm, Corsair, Fortress)  
+- Automated encounter resolution  
+- Multiple enemy archetypes  
 - Defender-first strike mechanic  
-- Hull integrity (HP) as survival core variable  
+- Hull integrity (HP) system  
+- Dedicated **BattleLog UI component**
 
 ---
 
-## ✨ Core Systems
+## ✨ Core Gameplay Systems
 
-### 🗺 Galaxy System
-- Procedural 3D map generation  
-- Energy-based scan mechanic  
-- Jump range validation (~800 units)  
-- Star system graph connections  
+### Turn-Based Orchestration
+End Turn triggers:
 
-### 🏗 Production System
-- Fabricator with production queue  
-- Specialized drone units:
-  - **Scouts** (exploration)
-  - **Miners** (resource extraction)
-  - **Defenders** (combat units)
+1. Resource extraction
+2. Production completion
+3. Combat resolution
+4. Battle log update
+5. XP calculation & level progression
 
-### 🔄 Turn-Based Game Loop
-On **End Turn**:
-1. Resource extraction phase  
-2. Production completion  
-3. Combat resolution  
-4. XP evaluation & level check  
-
-### 📈 Progression System
-- XP gained from scans and combat  
-- Level-ups increase energy capacity  
-- Energy reset on level-up  
+### Progression System
+- XP gained from scans and victories
+- Level-ups increase:
+  - Maximum energy capacity
+  - Maximum hull integrity (HP)
+- Energy restored on level-up
 
 ---
 
 ## 🧠 Technical Architecture
 
+### Scene Structure (Godot Node-Based)
+
 ```
-GameManager
-  ├── GalaxyGenerator
-  ├── TurnManager
-  ├── CombatResolver
-  ├── FabricatorSystem
-  ├── ResourceManager
-  └── XPSystem
+Main3D
+ ├── Managers
+ │    ├── TurnManager
+ │    ├── CombatManager
+ │    ├── MiningManager
+ │    ├── ScanManager
+ │    ├── PrinterManager
+ │    └── GalaxyMap3D
+ │
+ ├── UI
+ │    ├── ResourceBar
+ │    ├── TurnInfo
+ │    ├── ActionButtons
+ │    └── CombatLog
 ```
 
-### Architectural Principles
+### Script-Based System Separation
 
-- Node-based modular structure  
-- Single-responsibility system components  
-- Centralized turn-state control  
-- Data-driven enemy configuration  
-- Designed for scalability (future sectors & factions)
+Each gameplay domain is encapsulated in its own manager script:
+
+- `TurnManager.gd`
+- `CombatManager.gd`
+- `MiningManager.gd`
+- `ScanManager.gd`
+- `PrinterManager.gd`
+- `GalaxyMap3D.gd`
+
+This ensures:
+
+- Single responsibility
+- Clear system boundaries
+- Expandability for future features
 
 ---
 
@@ -132,46 +145,69 @@ GameManager
 | Language | GDScript |
 | Architecture | Node-based Scene System |
 | Rendering | 3D |
-| Gameplay Model | Turn-Based Strategy |
 | Assets | Kenney Space Kit (CC0) |
+| Model Format | GLTF |
 
 ---
 
 ## 🚀 Getting Started
 
-1. Install Godot 4.x  
-   https://godotengine.org  
+### Install Godot 4
 
-2. Clone repository
+Official website:  
+https://godotengine.org  
+
+Steam version:  
+https://store.steampowered.com/app/404790/Godot_Engine/
+
+---
+
+### Clone Repository
 
 ```bash
 git clone https://github.com/Codenix-1349/Project_Guppi.git
 ```
 
-3. Open the project in Godot  
-4. Run the main scene  
+Open the project in Godot and run the main scene.
+
+---
+
+## 🎨 Asset Integration
+
+This project uses **Kenney – Space Kit (CC0)**.
+
+Download:  
+https://kenney.nl/assets/space-kit
+
+Place assets inside:
+
+```
+res://kenney_space-kit/
+```
+
+Example structure:
+
+```
+res/
+ ├── assets/
+ ├── audio/
+ ├── data/
+ ├── docs/
+ ├── kenney_space-kit/
+ └── scenes/
+```
 
 ---
 
 ## 🎯 What This Project Demonstrates
 
-- Turn-based gameplay architecture  
-- Procedural content generation  
-- Resource simulation systems  
+- Modular system-driven architecture  
+- Turn-based game loop orchestration  
+- Procedural map generation  
+- Resource simulation mechanics  
 - Combat resolution logic  
-- Modular system design  
-- Scalable game framework design  
-
----
-
-## 📦 Planned Evolution
-
-- Sector-based difficulty scaling  
-- Faction diplomacy system  
-- Visual ship module upgrades  
-- Advanced enemy AI  
-- Save/Load system  
-- Steam build preparation  
+- Structured Godot project organization  
+- Scalable manager-based design  
 
 ---
 
