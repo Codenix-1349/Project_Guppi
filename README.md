@@ -46,7 +46,7 @@ Jede Begegnung fordert taktische Entscheidungen – kämpfen oder fliehen?
 
 ## 🚀 Features
 
-*   **Galaxien-Erkundung**: Navigiere durch ein vernetztes System von Sternen in 2D- oder 3D-Ansichten.
+*   **Galaxien-Erkundung**: Navigiere durch ein vernetztes System von Sternen in einer 3D-Ansicht.
 *   **Ressourcen-Management**: Sammle Eisen (FE), Titan (TI) und Uran (U) sowie Forschungsdaten. Verwalte deine Energie für Jumps und Scans.
 *   **Drohnen-Fabrikator**: Baue spezialisierte Einheiten:
 	*   **Scouts**: Sonden für die Fernerkundung entfernter Systeme.
