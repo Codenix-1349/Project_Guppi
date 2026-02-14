@@ -53,6 +53,14 @@ extends Node
 const PICK_LAYER_BIT := 10
 const PICK_LAYER_MASK := 1 << PICK_LAYER_BIT
 
+# ✅ BattleLog placement + sizing (bottom-right corner)
+const BATTLELOG_MARGIN_RIGHT := 16.0
+const BATTLELOG_MARGIN_BOTTOM := 24.0
+const BATTLELOG_W_EXPANDED := 420.0
+const BATTLELOG_H_EXPANDED := 260.0
+const BATTLELOG_W_COLLAPSED := 190.0
+const BATTLELOG_H_HEADER := 44.0
+
 
 func _ready():
 	# Connect signals
@@ -245,9 +253,12 @@ func _update_detailed_info():
 			total_miners += m_count
 
 			planet_list += "[color=cyan]" + p.name + "[/color]: FE " + str(p.resources.iron)
-			if p.resources.titanium > 0: planet_list += " | TI " + str(p.resources.titanium)
-			if p.resources.uranium > 0: planet_list += " | U " + str(p.resources.uranium)
-			if m_count > 0: planet_list += " ([color=green]Miners: " + str(m_count) + "[/color])"
+			if p.resources.titanium > 0:
+				planet_list += " | TI " + str(p.resources.titanium)
+			if p.resources.uranium > 0:
+				planet_list += " | U " + str(p.resources.uranium)
+			if m_count > 0:
+				planet_list += " ([color=green]Miners: " + str(m_count) + "[/color])"
 			planet_list += "\n"
 
 			for res in total_res:
@@ -288,9 +299,14 @@ func _update_detailed_info():
 		system_content.text = p_info
 
 
-func _on_print_scout(): _on_print_requested("scout_v1")
-func _on_print_miner(): _on_print_requested("miner_v1")
-func _on_print_defender(): _on_print_requested("defender_v1")
+func _on_print_scout():
+	_on_print_requested("scout_v1")
+
+func _on_print_miner():
+	_on_print_requested("miner_v1")
+
+func _on_print_defender():
+	_on_print_requested("defender_v1")
 
 func _on_print_requested(drone_id: String):
 	var drone = Global.get_drone_by_id(drone_id)
@@ -306,10 +322,14 @@ func _on_printer_updated():
 func _on_combat_occurred(report):
 	var status_text = "GEFECHT: "
 	match report.status:
-		"VICTORY": status_text += "SIEG!"
-		"SKIRMISH_LOSS": status_text += "RÜCKZUG / VERLUSTE"
-		"CRITICAL_DAMAGE": status_text += "KRITISCHER TREFFER (HÜLLE!)"
-		_: status_text += str(report.status)
+		"VICTORY":
+			status_text += "SIEG!"
+		"SKIRMISH_LOSS":
+			status_text += "RÜCKZUG / VERLUSTE"
+		"CRITICAL_DAMAGE":
+			status_text += "KRITISCHER TREFFER (HÜLLE!)"
+		_:
+			status_text += str(report.status)
 
 	combat_log.text = status_text
 	if report.xp_gained > 0:
@@ -414,9 +434,9 @@ func update_scout_button():
 
 	launch_scout_btn.disabled = !in_range or !has_scout or turn_manager.current_phase != turn_manager.Phase.PLANNING
 
-	if !has_scout:
+	if not has_scout:
 		launch_scout_btn.tooltip_text = "Keine Scouts im Inventar"
-	elif !in_range:
+	elif not in_range:
 		launch_scout_btn.tooltip_text = "Ziel außer Reichweite (> 800)"
 	elif turn_manager.current_phase != turn_manager.Phase.PLANNING:
 		launch_scout_btn.tooltip_text = "Nur in der Planungsphase möglich"
@@ -455,11 +475,11 @@ func _on_end_turn_pressed():
 func _on_phase_changed(new_phase):
 	update_ui()
 	var is_planning = (new_phase == turn_manager.Phase.PLANNING)
-	jump_button.disabled = !is_planning
-	scan_button.disabled = !is_planning
-	print_scout_btn.disabled = !is_planning
-	print_miner_btn.disabled = !is_planning
-	print_defender_btn.disabled = !is_planning
+	jump_button.disabled = not is_planning
+	scan_button.disabled = not is_planning
+	print_scout_btn.disabled = not is_planning
+	print_miner_btn.disabled = not is_planning
+	print_defender_btn.disabled = not is_planning
 
 	match new_phase:
 		turn_manager.Phase.PLANNING:
@@ -525,7 +545,6 @@ func _process_3d_selection(mouse_pos: Vector2, is_double_click: bool = false) ->
 	query.collide_with_bodies = true
 	query.collision_mask = PICK_LAYER_MASK
 
-	# ✅ IMPORTANT: Main.gd is Node, so use the camera/world, not self.get_world_3d()
 	var world: World3D = cam.get_world_3d()
 	if world == null:
 		return
@@ -606,7 +625,7 @@ var _combat_flee_btn: Button
 var _combat_close_btn: Button
 
 # ---------------------------
-# RUNTIME BATTLE LOG UI (combat-only, collapsible, never blocks buttons)
+# RUNTIME BATTLE LOG UI (combat-only, collapsible)
 # ---------------------------
 
 var _battle_panel: PanelContainer
@@ -626,12 +645,18 @@ func _set_combat_mode(active: bool) -> void:
 
 	var nodes_to_toggle: Array = []
 
-	if system_panel: nodes_to_toggle.append(system_panel)
-	if _ui_action_buttons: nodes_to_toggle.append(_ui_action_buttons)
-	if _ui_printer_status: nodes_to_toggle.append(_ui_printer_status)
-	if _ui_fabricator: nodes_to_toggle.append(_ui_fabricator)
-	if _ui_info_panel: nodes_to_toggle.append(_ui_info_panel)
-	if combat_log: nodes_to_toggle.append(combat_log)
+	if system_panel:
+		nodes_to_toggle.append(system_panel)
+	if _ui_action_buttons:
+		nodes_to_toggle.append(_ui_action_buttons)
+	if _ui_printer_status:
+		nodes_to_toggle.append(_ui_printer_status)
+	if _ui_fabricator:
+		nodes_to_toggle.append(_ui_fabricator)
+	if _ui_info_panel:
+		nodes_to_toggle.append(_ui_info_panel)
+	if combat_log:
+		nodes_to_toggle.append(combat_log)
 
 	if active:
 		_saved_vis.clear()
@@ -659,6 +684,7 @@ func _setup_combat_ui():
 	_combat_panel.name = "CombatPanelRuntime"
 	_combat_panel.visible = false
 	_combat_panel.mouse_filter = Control.MOUSE_FILTER_STOP
+	_combat_panel.z_index = 2000
 
 	_combat_panel.anchor_left = 0.0
 	_combat_panel.anchor_top = 0.0
@@ -789,15 +815,15 @@ func _setup_battle_log_ui():
 	_battle_panel = PanelContainer.new()
 	_battle_panel.name = "BattleLogRuntime"
 	_battle_panel.visible = false
-	_battle_panel.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	_battle_panel.z_index = 2000
+	_battle_panel.mouse_filter = Control.MOUSE_FILTER_STOP
+	_battle_panel.top_level = true
+	_battle_panel.z_index = 3000
 
 	_battle_panel.anchor_left = 1.0
 	_battle_panel.anchor_top = 1.0
 	_battle_panel.anchor_right = 1.0
 	_battle_panel.anchor_bottom = 1.0
-	_battle_panel.offset_right = -16
-	_battle_panel.offset_bottom = -16
+	_battle_panel.offset_right = -BATTLELOG_MARGIN_RIGHT
 
 	var bg := StyleBoxFlat.new()
 	bg.bg_color = Color(0.02, 0.02, 0.03, 0.78)
@@ -846,9 +872,9 @@ func _setup_battle_log_ui():
 	_battle_rich = RichTextLabel.new()
 	_battle_rich.bbcode_enabled = true
 	_battle_rich.scroll_active = false
-	_battle_rich.fit_content = false
+	_battle_rich.fit_content = true
 	_battle_rich.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	_battle_rich.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	_battle_rich.size_flags_vertical = Control.SIZE_SHRINK_BEGIN
 	_battle_rich.text = ""
 	_battle_scroll.add_child(_battle_rich)
 
@@ -860,7 +886,6 @@ func _set_battle_log_active(active: bool) -> void:
 		return
 	_battle_panel.visible = active
 	if not active:
-		_battle_panel.mouse_filter = Control.MOUSE_FILTER_IGNORE
 		_battle_rich.text = ""
 		_battle_collapsed = true
 		_apply_battle_log_layout()
@@ -869,22 +894,27 @@ func _apply_battle_log_layout() -> void:
 	if _battle_panel == null:
 		return
 
+	var right := -BATTLELOG_MARGIN_RIGHT
+	var bottom := -BATTLELOG_MARGIN_BOTTOM
+
 	if _battle_collapsed:
 		_battle_toggle_btn.text = "Show"
 		_battle_scroll.visible = false
-		_battle_panel.custom_minimum_size = Vector2(190, 0)
-		_battle_panel.offset_left = -190
-		_battle_panel.offset_top = -44
-		_battle_panel.mouse_filter = Control.MOUSE_FILTER_STOP
+		_battle_panel.custom_minimum_size = Vector2(BATTLELOG_W_COLLAPSED, 0)
+
+		_battle_panel.offset_right = right
+		_battle_panel.offset_left = -(BATTLELOG_W_COLLAPSED + BATTLELOG_MARGIN_RIGHT)
+		_battle_panel.offset_bottom = bottom
+		_battle_panel.offset_top = bottom - BATTLELOG_H_HEADER
 	else:
 		_battle_toggle_btn.text = "Hide"
 		_battle_scroll.visible = true
-		var w: float = 560
-		var h: float = 300
-		_battle_panel.custom_minimum_size = Vector2(w, h)
-		_battle_panel.offset_left = -w
-		_battle_panel.offset_top = -h
-		_battle_panel.mouse_filter = Control.MOUSE_FILTER_STOP
+		_battle_panel.custom_minimum_size = Vector2(BATTLELOG_W_EXPANDED, BATTLELOG_H_EXPANDED)
+
+		_battle_panel.offset_right = right
+		_battle_panel.offset_left = -(BATTLELOG_W_EXPANDED + BATTLELOG_MARGIN_RIGHT)
+		_battle_panel.offset_bottom = bottom
+		_battle_panel.offset_top = bottom - BATTLELOG_H_EXPANDED
 
 func _update_battle_log_text(payload: Dictionary) -> void:
 	if _battle_panel == null:
@@ -907,7 +937,8 @@ func _scroll_battle_log_to_bottom() -> void:
 	if _battle_scroll == null:
 		return
 	await get_tree().process_frame
-	var sb = _battle_scroll.get_v_scroll_bar()
+	await get_tree().process_frame
+	var sb := _battle_scroll.get_v_scroll_bar()
 	if sb:
 		_battle_scroll.scroll_vertical = int(sb.max_value)
 
