@@ -18,13 +18,13 @@ The project emphasizes:
 
 - Procedural galaxy generation  
 - Modular manager-based architecture  
-- Turn-based system orchestration  
+- Turn-based orchestration  
 - Resource simulation  
 - Drone production systems  
 - Automated combat resolution  
 - Integrated battle logging  
 
-It demonstrates scalable game system design and structured scene architecture within the Godot engine.
+It demonstrates scalable game system design and structured scene architecture within Godot.
 
 ---
 
@@ -82,18 +82,18 @@ It demonstrates scalable game system design and structured scene architecture wi
 ### Turn-Based Orchestration
 End Turn triggers:
 
-1. Resource extraction
-2. Production completion
-3. Combat resolution
-4. Battle log update
-5. XP calculation & level progression
+1. Resource extraction  
+2. Production completion  
+3. Combat resolution  
+4. Battle log update  
+5. XP calculation & level progression  
 
 ### Progression System
-- XP gained from scans and victories
+- XP gained from scans and victories  
 - Level-ups increase:
-  - Maximum energy capacity
-  - Maximum hull integrity (HP)
-- Energy restored on level-up
+  - Maximum energy capacity  
+  - Maximum hull integrity (HP)  
+- Energy restored on level-up  
 
 ---
 
@@ -120,8 +120,6 @@ Main3D
 
 ### Script-Based System Separation
 
-Each gameplay domain is encapsulated in its own manager script:
-
 - `TurnManager.gd`
 - `CombatManager.gd`
 - `MiningManager.gd`
@@ -129,11 +127,12 @@ Each gameplay domain is encapsulated in its own manager script:
 - `PrinterManager.gd`
 - `GalaxyMap3D.gd`
 
-This ensures:
+Architecture Principles:
 
-- Single responsibility
-- Clear system boundaries
-- Expandability for future features
+- Single-responsibility systems  
+- Centralized turn-state control  
+- Expandable modular design  
+- Data-driven enemy logic  
 
 ---
 
@@ -185,29 +184,52 @@ Place assets inside:
 res://kenney_space-kit/
 ```
 
-Example structure:
+---
 
-```
-res/
- ├── assets/
- ├── audio/
- ├── data/
- ├── docs/
- ├── kenney_space-kit/
- └── scenes/
-```
+## 🛣 Planned Features / Roadmap
+
+### 🌍 Factions & Diplomacy
+- Multiple alien factions with distinct traits
+- Diplomatic states (Neutral, Allied, Hostile)
+- Trade & negotiation systems
+- Reputation-based interactions
+
+### 🏗 Colonization System
+- Planet colonization mechanics
+- Surface building placement:
+  - Factory
+  - Mine
+  - Research Station
+- Production bonuses per planet type
+
+### 🔬 Technology Tree
+- Unlockable upgrades
+- Branching research paths
+- Weapon and ship module progression
+- Strategic specialization
+
+### 🔫 Advanced Weapon Systems
+- Different weapon classes
+- Offensive vs defensive builds
+- Ship module customization
+- Tactical loadout decisions
+
+### 🎮 3D Tactical Combat Mode
+- Optional real-time or tactical combat scene
+- Camera-controlled battle arena
+- Unit positioning mechanics
+- Visual combat feedback
 
 ---
 
 ## 🎯 What This Project Demonstrates
 
 - Modular system-driven architecture  
-- Turn-based game loop orchestration  
-- Procedural map generation  
+- Turn-based gameplay orchestration  
+- Procedural generation systems  
 - Resource simulation mechanics  
 - Combat resolution logic  
-- Structured Godot project organization  
-- Scalable manager-based design  
+- Expandable long-term design vision  
 
 ---
 
