@@ -61,8 +61,15 @@ const BATTLELOG_H_EXPANDED := 260.0
 const BATTLELOG_W_COLLAPSED := 190.0
 const BATTLELOG_H_HEADER := 44.0
 
+# ✅ External asset check (Kenney Space Kit)
+const KENNEY_BASE_DIR := "res://kenney_space-kit"
+const KENNEY_REQUIRED_DIR := "res://kenney_space-kit/Models"
+
 
 func _ready():
+	# ✅ Warn early if external graphics are missing (do NOT check README placeholder)
+	_check_required_assets()
+
 	# Connect signals
 	turn_manager.phase_changed.connect(_on_phase_changed)
 	turn_manager.turn_completed.connect(_on_turn_completed)
@@ -119,6 +126,33 @@ func _ready():
 
 	_on_phase_changed(turn_manager.current_phase)
 	update_ui()
+
+
+# ---------------------------
+# External graphics assets check
+# ---------------------------
+
+func _check_required_assets() -> void:
+	# We expect the real Kenney assets to include "Models/" (your screenshot shows it).
+	# If the repo only contains a placeholder folder, this will be missing.
+	if not DirAccess.dir_exists_absolute(KENNEY_REQUIRED_DIR):
+		_show_missing_assets_message()
+		return
+
+func _show_missing_assets_message() -> void:
+	var msg := "⚠ Grafik-Assets fehlen!\n" \
+		+ "Dieses Projekt benötigt das Kenney Space Kit.\n" \
+		+ "Bitte herunterladen und nach:\n" \
+		+ KENNEY_BASE_DIR + "\n" \
+		+ "entpacken (so dass '" + KENNEY_REQUIRED_DIR + "' existiert).\n" \
+		+ "Siehe README.md."
+
+	push_warning(msg)
+
+	# Show in-game if possible (keeps it visible, not just console)
+	if combat_log:
+		combat_log.text = msg
+		combat_log.visible = true
 
 
 func _apply_random_start_system_if_available() -> void:
@@ -432,7 +466,7 @@ func update_scout_button():
 	var in_range = scout_manager.can_scout_system(m_pos, t_pos, s_range)
 	var has_scout = printer_manager.inventory.get("scout_v1", 0) > 0
 
-	launch_scout_btn.disabled = !in_range or !has_scout or turn_manager.current_phase != turn_manager.Phase.PLANNING
+	launch_scout_btn.disabled = not in_range or not has_scout or turn_manager.current_phase != turn_manager.Phase.PLANNING
 
 	if not has_scout:
 		launch_scout_btn.tooltip_text = "Keine Scouts im Inventar"
