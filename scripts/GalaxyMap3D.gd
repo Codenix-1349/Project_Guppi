@@ -358,10 +358,10 @@ func _generate_enemies_random_scaled() -> void:
 		var enemy_type: Dictionary = pool[_rng_encounters.randi_range(0, pool.size() - 1)]
 		var count: int = _rng_encounters.randi_range(enemy_min_count, enemy_max_count)
 
-		# scale factor 1.0 .. (1.0 + enemy_scale_strength)
+		# ✅ FIX: rename scale -> enemy_scale (avoid shadowing Node3D.scale)
 		var d01: float = system["position"].distance_to(start_pos) / max_d
 		d01 = clamp(d01, 0.0, 1.0)
-		var scale: float = 1.0 + (enemy_scale_strength * d01)
+		var enemy_scale: float = 1.0 + (enemy_scale_strength * d01)
 
 		# further away: sometimes +1 extra enemy
 		if d01 > 0.66 and _rng_encounters.randf() < 0.45:
@@ -369,23 +369,24 @@ func _generate_enemies_random_scaled() -> void:
 
 		for _c in range(count):
 			var e: Dictionary = enemy_type.duplicate(true)
-			_scale_enemy_dict(e, scale)
+			_scale_enemy_dict(e, enemy_scale)
 			system["enemies"].append(e)
 
-func _scale_enemy_dict(e: Dictionary, scale: float) -> void:
+# ✅ FIX: rename param scale -> enemy_scale (avoid shadowing Node3D.scale)
+func _scale_enemy_dict(e: Dictionary, enemy_scale: float) -> void:
 	# supports both formats: stats:{durability, firepower} or flat keys
 	if e.has("stats") and typeof(e["stats"]) == TYPE_DICTIONARY:
 		var st: Dictionary = e["stats"] as Dictionary
 		if st.has("durability"):
-			st["durability"] = max(1, int(round(float(st["durability"]) * scale)))
+			st["durability"] = max(1, int(round(float(st["durability"]) * enemy_scale)))
 		if st.has("firepower"):
-			st["firepower"] = max(1, int(round(float(st["firepower"]) * lerp(1.0, 1.0 + (scale - 1.0) * 0.75, 1.0))))
+			st["firepower"] = max(1, int(round(float(st["firepower"]) * lerp(1.0, 1.0 + (enemy_scale - 1.0) * 0.75, 1.0))))
 		e["stats"] = st
 	else:
 		if e.has("durability"):
-			e["durability"] = max(1, int(round(float(e["durability"]) * scale)))
+			e["durability"] = max(1, int(round(float(e["durability"]) * enemy_scale)))
 		if e.has("firepower"):
-			e["firepower"] = max(1, int(round(float(e["firepower"]) * lerp(1.0, 1.0 + (scale - 1.0) * 0.75, 1.0))))
+			e["firepower"] = max(1, int(round(float(e["firepower"]) * lerp(1.0, 1.0 + (enemy_scale - 1.0) * 0.75, 1.0))))
 
 # ----------------------------
 # Spiral galaxy position
@@ -669,7 +670,7 @@ func _create_mothership_mesh() -> void:
 		mothership_mesh.queue_free()
 		mothership_mesh = null
 
-	var ship_scene = load(MODEL_PATH + "craft_cargoB.glb")
+	var ship_scene = load(MODEL_PATH + "craft_cargoA.glb")
 	if ship_scene:
 		mothership_mesh = (ship_scene as PackedScene).instantiate()
 		_tag_generated(mothership_mesh)
