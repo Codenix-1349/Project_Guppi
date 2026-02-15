@@ -87,8 +87,8 @@ Each turn progresses through a structured multi-phase pipeline:
 The player issues commands (movement, production, system interactions) and confirms the turn.
 
 ### 2️⃣ Execution Phase
-Queued actions are executed in sequence.  
-(Visual movement, command processing, drone activity, etc.)
+Execution Phase (placeholder) – reserved for action sequencing / animation playback (e.g., mothership movement between star systems, drone deployment, scouting operations and Fog-of-War reveal).
+
 
 ### 3️⃣ Resolve Phase
 Core turn mechanics are processed:
