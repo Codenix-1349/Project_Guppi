@@ -208,6 +208,8 @@ Place assets inside:
 ```
 res://kenney_space-kit/
 ```
+The folder `res://kenney_space-kit/` is already included in the project.
+Simply extract the asset pack into this directory.
 
 Example structure:
 
