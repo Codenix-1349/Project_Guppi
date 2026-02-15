@@ -79,14 +79,39 @@ It demonstrates scalable game system design and structured scene architecture wi
 
 ## ✨ Core Gameplay Systems
 
-### Turn-Based Orchestration
-End Turn triggers:
+## 🔄 Turn-Based Orchestration
 
-1. Resource extraction  
-2. Production completion  
-3. Combat resolution  
-4. Battle log update  
-5. XP calculation & level progression  
+Each turn progresses through a structured multi-phase pipeline:
+
+### 1️⃣ Planning Phase
+The player issues commands (movement, production, system interactions) and confirms the turn.
+
+### 2️⃣ Execution Phase
+Queued actions are executed in sequence.  
+(Visual movement, command processing, drone activity, etc.)
+
+### 3️⃣ Resolve Phase
+Core turn mechanics are processed:
+
+- Resource extraction (MiningManager)
+- Production completion (PrinterManager)
+- Energy regeneration (level-scaled cap)
+- Enemy encounter detection
+- Combat initiation (if hostile presence exists)
+
+If combat is triggered, the turn flow pauses until the encounter is resolved.
+
+### 4️⃣ Event Phase
+Post-resolution effects are processed:
+
+- Event / anomaly handling
+- Battle log updates
+- XP calculation
+- Level progression
+- Turn counter increment
+
+The game then transitions back to the Planning Phase.
+
 
 ### Progression System
 - XP gained from scans and victories  
