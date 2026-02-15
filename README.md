@@ -105,7 +105,6 @@ If combat is triggered, the turn flow pauses until the encounter is resolved.
 Post-resolution effects are processed:
 
 - Event / anomaly handling
-- Battle log updates
 - XP calculation
 - Level progression
 - Turn counter increment
