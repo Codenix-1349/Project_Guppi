@@ -81,18 +81,17 @@ It demonstrates scalable game system design and structured scene architecture wi
 
 ## 🔄 Turn-Based Orchestration
 
-Each turn progresses through a structured multi-phase pipeline:
+Each turn progresses through a structured four-phase pipeline:
 
 ### 1️⃣ Planning Phase
 The player issues commands (movement, production, system interactions) and confirms the turn.
 
 ### 2️⃣ Execution Phase
-Execution Phase (placeholder) – reserved for action sequencing / animation playback 
-(e.g., mothership movement between star systems, drone deployment, scouting operations and Fog-of-War reveal).
-
+Currently a structural placeholder reserved for action sequencing and animation playback  
+(e.g., mothership travel between systems, drone deployment, scouting operations, Fog-of-War reveal).
 
 ### 3️⃣ Resolve Phase
-Core turn mechanics are processed:
+Core deterministic turn mechanics are processed:
 
 - Resource extraction (MiningManager)
 - Production completion (PrinterManager)
