@@ -899,53 +899,10 @@ const PLANET_TYPES: Array[String] = [
 ]
 
 func _get_planet_scene_path(p_data: Dictionary) -> String:
-	var res: Dictionary = p_data.get("resources", {})
-	var uranium: int = int(res.get("uranium", 0))
-	var titanium: int = int(res.get("titanium", 0))
-	var iron: int = int(res.get("iron", 0))
-
-	# Build weighted pool based on resources
-	var weights: Array[float] = [
-		0.20,  # terrestrial (base)
-		0.15,  # ice
-		0.10,  # lava
-		0.15,  # sand
-		0.20,  # gaseous
-		0.20   # barren
-	]
-
-	# Resources shift probabilities
-	if uranium > 5:
-		weights[2] += 0.40  # lava much more likely
-		weights[0] -= 0.10
-		weights[5] -= 0.10
-	if titanium > 5:
-		weights[1] += 0.35  # ice more likely
-		weights[3] -= 0.10
-		weights[5] -= 0.10
-	if iron > 200:
-		weights[0] += 0.25  # terrestrial more likely
-		weights[4] -= 0.10
-		weights[5] -= 0.10
-
-	# Clamp negatives
-	for w in range(weights.size()):
-		weights[w] = maxf(0.02, weights[w])
-
-	# Deterministic selection seeded by planet name
+	# Equal distribution — purely visual, decoupled from resources
 	var seed_hash: int = int(abs(str(p_data.get("name", "planet")).hash()))
-	var total: float = 0.0
-	for wt in weights:
-		total += wt
-
-	var pick: float = fmod(float(seed_hash) / 100000.0, 1.0) * total
-	var accum: float = 0.0
-	for idx in range(PLANET_TYPES.size()):
-		accum += weights[idx]
-		if pick <= accum:
-			return PLANET_SCENE_BASE + PLANET_TYPES[idx]
-
-	return PLANET_SCENE_BASE + "planet_terrestrial.tscn"
+	var type_idx: int = seed_hash % PLANET_TYPES.size()
+	return PLANET_SCENE_BASE + PLANET_TYPES[type_idx]
 
 func _add_selection_ring(parent_node: Node3D) -> Node3D:
 	var bracket_scene: Node3D = Node3D.new()
