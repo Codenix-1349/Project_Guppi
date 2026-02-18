@@ -310,10 +310,11 @@ func generate_map_3d() -> void:
 					body_mat.set_shader_parameter("color_3", sc["c3"])
 					body_mat.set_shader_parameter("color_4", sc["c2"])
 					body_mat.set_shader_parameter("color_5", sc["c3"])
+					body_mat.set_shader_parameter("emit", 1.2) # lower → shows surface detail
 					body_mi.mesh = body_mi.mesh.duplicate()
 					(body_mi.mesh as SphereMesh).material = body_mat
 
-			# Recolor atmosphere
+			# Recolor atmosphere (softer glow)
 			var atmo: MeshInstance3D = star_mesh.get_node_or_null("Atmosphere") as MeshInstance3D
 			if atmo and atmo.mesh:
 				var atmo_mat: ShaderMaterial = atmo.mesh.material as ShaderMaterial
@@ -322,6 +323,7 @@ func generate_map_3d() -> void:
 					atmo_mat = atmo_mat.duplicate() as ShaderMaterial
 					atmo_mat.set_shader_parameter("color_1", sc2["c1"])
 					atmo_mat.set_shader_parameter("color_2", sc2["c3"])
+					atmo_mat.set_shader_parameter("intensity", 5.0) # lower → less blowout
 					atmo.mesh = atmo.mesh.duplicate()
 					(atmo.mesh as SphereMesh).material = atmo_mat
 		else:
