@@ -3,9 +3,9 @@
 
 <p align="left">
   <img alt="Godot" title="Godot 4 Engine" height="34" style="margin-right:22px;"
-       src="https://raw.githubusercontent.com/github/explore/main/topics/godot/godot.png" />
+	   src="https://raw.githubusercontent.com/github/explore/main/topics/godot/godot.png" />
   <img alt="Game Development" title="Game Development" height="34"
-       src="https://raw.githubusercontent.com/github/explore/main/topics/game-development/game-development.png" />
+	   src="https://raw.githubusercontent.com/github/explore/main/topics/game-development/game-development.png" />
 </p>
 
 ---

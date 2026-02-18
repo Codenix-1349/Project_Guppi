@@ -15,6 +15,7 @@ Thumbs.db
 
 # Godot temp
 *.tmp
+*.uid
 
 # Local asset packs (do not commit)
 kenney_space-kit.zip
