@@ -331,6 +331,10 @@ func _attach_pick_sphere(target: Node3D, radius: float, pick_type: String, meta:
 	area.set_meta("pick_type", pick_type)
 	for k in meta.keys():
 		area.set_meta(k, meta[k])
+	
+	# Fix: Set collision layer to match SelectionHandler raycast (Bit 10)
+	area.collision_layer = 1 << 10
+	area.collision_mask = 0
 
 	var cs := CollisionShape3D.new()
 	var sph := SphereShape3D.new()

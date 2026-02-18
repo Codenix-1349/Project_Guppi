@@ -409,6 +409,10 @@ func _attach_pick_box(target: Node3D, pick_type: String) -> void:
 	area.name = "PickArea"
 	area.set_meta("pick_type", pick_type)
 
+	# Fix: Set collision layer to match SelectionHandler raycast (Bit 10)
+	area.collision_layer = 1 << 10
+	area.collision_mask = 0
+
 	var cs := CollisionShape3D.new()
 	var sph := SphereShape3D.new()
 	sph.radius = radius
