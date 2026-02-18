@@ -403,7 +403,7 @@ func _attach_pick_box(target: Node3D, pick_type: String) -> void:
 		target.get_node("PickArea").queue_free()
 
 	# Simple AABB approximation approx
-	var radius: float = 2.0
+	var radius: float = 0.7
 	
 	var area: Area3D = Area3D.new()
 	area.name = "PickArea"
