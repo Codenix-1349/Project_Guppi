@@ -603,6 +603,17 @@ func _render_segment_bar(hp: int, max_hp: int) -> String:
 func _log_line(text_bb: String) -> void:
 	_log_buffer.append(text_bb)
 
+func _build_end_payload(result_text: String) -> Dictionary:
+	return {
+		"result": result_text,
+		"status": _build_status_bb("ENCOUNTER ENDED"),
+		"fleet_bb": _build_fleet_bb(),
+		"enemy_bb": _build_enemy_bb(),
+		"log_bb": get_log_bb(),
+		"fleet_units": _build_fleet_units_payload(),
+		"enemy_units": _build_enemy_units_payload()
+	}
+
 func _end_victory() -> void:
 	var xp: int = 50 * max(1, _system_enemy_ref.size())
 	Global.gain_xp(xp)
@@ -611,70 +622,22 @@ func _end_victory() -> void:
 	_system_enemy_ref.clear()
 	_active = false
 
-	var payload: Dictionary = {
-		"result": "SIEG (+%d XP)" % xp,
-		"status": _build_status_bb("ENCOUNTER ENDED"),
-		"fleet_bb": _build_fleet_bb(),
-		"enemy_bb": _build_enemy_bb(),
-		"log_bb": get_log_bb(),
-		"fleet_units": _build_fleet_units_payload(),
-		"enemy_units": _build_enemy_units_payload()
-	}
-	emit_signal("encounter_ended", payload)
-
-	var report: Dictionary = {
-		"status": "VICTORY",
-		"xp_gained": xp,
-		"mothership_damage": 0,
-		"player_losses": {}
-	}
-	emit_signal("combat_occurred", report)
+	emit_signal("encounter_ended", _build_end_payload("SIEG (+%d XP)" % xp))
+	emit_signal("combat_occurred", {"status": "VICTORY", "xp_gained": xp, "mothership_damage": 0, "player_losses": {}})
 
 func _end_flee() -> void:
 	_active = false
 	_log_line("\n[color=yellow]Du ziehst dich zurück.[/color]")
 
-	var payload: Dictionary = {
-		"result": "FLUCHT",
-		"status": _build_status_bb("ENCOUNTER ENDED"),
-		"fleet_bb": _build_fleet_bb(),
-		"enemy_bb": _build_enemy_bb(),
-		"log_bb": get_log_bb(),
-		"fleet_units": _build_fleet_units_payload(),
-		"enemy_units": _build_enemy_units_payload()
-	}
-	emit_signal("encounter_ended", payload)
-
-	var report: Dictionary = {
-		"status": "FLED",
-		"xp_gained": 0,
-		"mothership_damage": 0,
-		"player_losses": {}
-	}
-	emit_signal("combat_occurred", report)
+	emit_signal("encounter_ended", _build_end_payload("FLUCHT"))
+	emit_signal("combat_occurred", {"status": "FLED", "xp_gained": 0, "mothership_damage": 0, "player_losses": {}})
 
 func _end_defeat(reason: String) -> void:
 	_log_line("\n[color=red][b]NIEDERLAGE![/b][/color] %s" % reason)
 	_active = false
 
-	var payload: Dictionary = {
-		"result": "NIEDERLAGE: %s" % reason,
-		"status": _build_status_bb("ENCOUNTER ENDED"),
-		"fleet_bb": _build_fleet_bb(),
-		"enemy_bb": _build_enemy_bb(),
-		"log_bb": get_log_bb(),
-		"fleet_units": _build_fleet_units_payload(),
-		"enemy_units": _build_enemy_units_payload()
-	}
-	emit_signal("encounter_ended", payload)
-
-	var report: Dictionary = {
-		"status": "DEFEAT",
-		"xp_gained": 0,
-		"mothership_damage": 0,
-		"player_losses": {}
-	}
-	emit_signal("combat_occurred", report)
+	emit_signal("encounter_ended", _build_end_payload("NIEDERLAGE: %s" % reason))
+	emit_signal("combat_occurred", {"status": "DEFEAT", "xp_gained": 0, "mothership_damage": 0, "player_losses": {}})
 
 # -------------------------
 # Counters
