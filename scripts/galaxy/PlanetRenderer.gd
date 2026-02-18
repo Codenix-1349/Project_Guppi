@@ -144,7 +144,7 @@ func update_unit_indicators(mining_manager_deployments: Dictionary) -> void:
 				(mesh as Node).queue_free()
 	_unit_indicators.clear()
 
-	var miner_scene = load("res://assets/models/craft_miner.glb") # adjust path if needed
+	var miner_scene = load("res://kenney_space-kit/Models/GLTF format/craft_miner.glb")
 
 	for key in mining_manager_deployments:
 		var count: int = int(mining_manager_deployments[key])

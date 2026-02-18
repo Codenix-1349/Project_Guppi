@@ -433,23 +433,22 @@ func _get_combined_local_aabb(root: Node) -> AABB:
 	# Recursively check children
 	for n in root.get_children():
 		if n is Node3D: # Only check Node3D
-			var child_aabb: AABB = _get_combined_local_aabb(n)
-			if child_aabb.size != Vector3.ZERO:
+			var child_local: AABB = _get_combined_local_aabb(n)
+			if child_local.size != Vector3.ZERO:
+				# Transform child AABB into root's space
+				# child_local is in n's space. n.transform is n relative to root (if n is child of root).
+				# Since this loop iterates direct children, n.transform is correct.
+				var child_on_root: AABB = k_transform_aabb(n.transform, child_local)
+				
 				if !have:
-					combined = child_aabb
+					combined = child_on_root
 					have = true
 				else:
-					combined = combined.merge(child_aabb)
+					combined = combined.merge(child_on_root)
 	
 	# Check self
 	if root is VisualInstance3D:
 		var aabb: AABB = (root as VisualInstance3D).get_aabb()
-		# Transform not needed if we want local AABB of hierarchy relative to root? 
-		# Wait, if child has transform, we need to respect it. 
-		# Simplification: VisualInstances usually return AABB in local space of Mesh.
-		# If child is moved, we need to transform AABB.
-		# But mothership model is usually a valid scene where children are positioned.
-		# Let's use a simpler heuristic for now: Just center on MeshInstance bounds if found.
 		if !have:
 			combined = aabb
 			have = true
@@ -457,3 +456,8 @@ func _get_combined_local_aabb(root: Node) -> AABB:
 			combined = combined.merge(aabb)
 			
 	return combined if have else AABB(Vector3.ZERO, Vector3.ZERO)
+
+# Helper to transform AABB (Godot 4 has standard AABB * Transform but it's good to be explicit for axis alignment)
+func k_transform_aabb(t: Transform3D, aabb: AABB) -> AABB:
+	# Godot 4: transform * aabb works and returns the enclosing AABB
+	return t * aabb
