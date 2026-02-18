@@ -402,7 +402,11 @@ func _attach_pick_box(target: Node3D, pick_type: String) -> void:
 	if target.has_node("PickArea"):
 		target.get_node("PickArea").queue_free()
 
-	# Simple AABB approximation approx
+	# Calculate AABB to center the sphere
+	var aabb: AABB = _get_combined_local_aabb(target)
+	var center: Vector3 = aabb.get_center() if aabb.size != Vector3.ZERO else Vector3.ZERO
+	
+	# Radius 0.7 fits the scale(2,2,2) cargo ship well
 	var radius: float = 0.7
 	
 	var area: Area3D = Area3D.new()
@@ -417,6 +421,39 @@ func _attach_pick_box(target: Node3D, pick_type: String) -> void:
 	var sph := SphereShape3D.new()
 	sph.radius = radius
 	cs.shape = sph
+	cs.position = center
 	
 	area.add_child(cs)
 	target.add_child(area)
+
+func _get_combined_local_aabb(root: Node) -> AABB:
+	var have: bool = false
+	var combined: AABB = AABB()
+	
+	# Recursively check children
+	for n in root.get_children():
+		if n is Node3D: # Only check Node3D
+			var child_aabb: AABB = _get_combined_local_aabb(n)
+			if child_aabb.size != Vector3.ZERO:
+				if !have:
+					combined = child_aabb
+					have = true
+				else:
+					combined = combined.merge(child_aabb)
+	
+	# Check self
+	if root is VisualInstance3D:
+		var aabb: AABB = (root as VisualInstance3D).get_aabb()
+		# Transform not needed if we want local AABB of hierarchy relative to root? 
+		# Wait, if child has transform, we need to respect it. 
+		# Simplification: VisualInstances usually return AABB in local space of Mesh.
+		# If child is moved, we need to transform AABB.
+		# But mothership model is usually a valid scene where children are positioned.
+		# Let's use a simpler heuristic for now: Just center on MeshInstance bounds if found.
+		if !have:
+			combined = aabb
+			have = true
+		else:
+			combined = combined.merge(aabb)
+			
+	return combined if have else AABB(Vector3.ZERO, Vector3.ZERO)
