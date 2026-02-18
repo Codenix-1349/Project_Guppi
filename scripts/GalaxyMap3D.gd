@@ -8,9 +8,9 @@ class_name GalaxyMap3D
 # ----------------------------
 # Modules
 # ----------------------------
-var star_renderer: StarRenderer
-var planet_renderer: PlanetRenderer
-var connection_generator: ConnectionGenerator
+var star_renderer: Node
+var planet_renderer: Node
+var connection_generator: Node
 
 # ----------------------------
 # Data

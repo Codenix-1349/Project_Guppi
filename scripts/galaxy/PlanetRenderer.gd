@@ -61,7 +61,7 @@ func process_orbits(time: float, systems: Array) -> void:
 		var sys: Dictionary = systems[s_idx]
 		var planets: Array = sys["planets"]
 
-		var arr: Array = _planet_meshes[s_idx_key]
+		var arr: Array = _planet_meshes[sys_idx_key]
 		for p_idx in range(arr.size()):
 			var p_mesh: Node3D = arr[p_idx] as Node3D
 			if p_mesh == null or !is_instance_valid(p_mesh):
