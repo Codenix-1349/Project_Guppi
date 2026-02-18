@@ -11,14 +11,38 @@ signal turn_completed(turn_num)
 
 var _waiting_for_combat: bool = false
 
+# Injected references (set by parent or via init)
+var _printer_manager: Node = null
+var _mining_manager: Node = null
+var _mothership: Node = null
+var _combat_manager: Node = null
+var _galaxy_map: Node = null
+
 func _ready() -> void:
 	print("Turn Manager initialized. Current Turn: ", turn_number)
+	_resolve_siblings()
 
-	# Pause RESOLVE until combat finished (if CombatManager exists)
-	if get_parent().has_node("CombatManager"):
-		var combat: Node = get_parent().get_node("CombatManager")
-		if combat != null and combat.has_signal("encounter_ended"):
-			combat.encounter_ended.connect(_on_encounter_ended)
+func _resolve_siblings() -> void:
+	var managers: Node = get_parent()
+	if managers == null:
+		return
+
+	if managers.has_node("CombatManager"):
+		_combat_manager = managers.get_node("CombatManager")
+		if _combat_manager.has_signal("encounter_ended"):
+			_combat_manager.encounter_ended.connect(_on_encounter_ended)
+
+	if managers.has_node("PrinterManager"):
+		_printer_manager = managers.get_node("PrinterManager")
+	if managers.has_node("MiningManager"):
+		_mining_manager = managers.get_node("MiningManager")
+	if managers.has_node("Mothership"):
+		_mothership = managers.get_node("Mothership")
+
+	# Galaxy map is a sibling of Managers, not a child
+	var main: Node = managers.get_parent()
+	if main != null and main.has_node("GalaxyMap3D"):
+		_galaxy_map = main.get_node("GalaxyMap3D")
 
 func next_phase() -> void:
 	match current_phase:
@@ -56,27 +80,17 @@ func resolve_turn() -> void:
 
 	print("Resolving turn results...")
 
-	# -----------------------------
-	# Energy regen per turn (capped)
-	# Desired rule:
-	#   Lvl 1: max 80 energy
-	#   Each further lvl: +20 max energy
-	# -----------------------------
-	var lvl: int = int(Global.mothership_level)
-	var max_energy: int = 100 + 10 * maxi(0, lvl - 1)
-	Global.resources.energy = mini(int(Global.resources.energy) + 20, max_energy)
+	# Energy regen per turn — uses Global's cap helpers (no duplicated formula)
+	var regen: int = 20
+	Global.resources.energy = mini(int(Global.resources.energy) + regen, int(Global.max_energy))
 
 	# Printer production
-	if get_parent().has_node("PrinterManager"):
-		get_parent().get_node("PrinterManager").process_turn()
+	if _printer_manager != null:
+		_printer_manager.process_turn()
 
 	# Mining
-	if get_parent().has_node("MiningManager"):
-		var main: Node = get_parent().get_parent()
-		if main != null:
-			var map: Node = main.get_node("GalaxyMap") if main.has_node("GalaxyMap") else main.get_node("GalaxyMap3D")
-			if map != null and ("systems" in map):
-				get_parent().get_node("MiningManager").process_turn(map.systems)
+	if _mining_manager != null and _galaxy_map != null and ("systems" in _galaxy_map):
+		_mining_manager.process_turn(_galaxy_map.systems)
 
 	# Combat check
 	if _check_for_skirmish_and_pause():
@@ -86,41 +100,25 @@ func resolve_turn() -> void:
 	next_phase() # To EVENT
 
 func _check_for_skirmish_and_pause() -> bool:
-	var managers: Node = get_parent()
-	if managers == null:
+	if _mothership == null or _combat_manager == null or _galaxy_map == null:
 		return false
-	if not managers.has_node("Mothership"):
-		return false
-	if not managers.has_node("PrinterManager"):
-		return false
-	if not managers.has_node("CombatManager"):
+	if not ("systems" in _galaxy_map):
 		return false
 
-	var ms: Node = managers.get_node("Mothership")
-	var current_system_idx: int = int(ms.get_current_system())
-
-	var main: Node = managers.get_parent()
-	if main == null:
-		return false
-
-	var map: Node = main.get_node("GalaxyMap") if main.has_node("GalaxyMap") else main.get_node("GalaxyMap3D")
-	if map == null:
-		return false
-	if not ("systems" in map):
-		return false
-
-	var system = map.systems[current_system_idx]
+	var current_system_idx: int = int(_mothership.get_current_system())
+	var system: Variant = _galaxy_map.systems[current_system_idx]
 	if system.enemies.size() <= 0:
 		return false
 
 	print("Enemy encounter in system ", system.name, "!")
 
-	var combat: Node = managers.get_node("CombatManager")
-	var inv: Dictionary = managers.get_node("PrinterManager").inventory
+	if _printer_manager == null:
+		return false
 
-	# ✅ New combat entrypoint (parse-safe, per-unit HP stacks)
-	if combat != null and combat.has_method("begin_encounter"):
-		combat.begin_encounter(system, inv)
+	var inv: Dictionary = _printer_manager.inventory
+
+	if _combat_manager.has_method("begin_encounter"):
+		_combat_manager.begin_encounter(system, inv)
 		return true
 
 	return false
