@@ -122,8 +122,6 @@ func _clear_generated_nodes() -> void:
 	unit_indicators.clear()
 
 	_planet_ring_nodes.clear()
-	_planet_noise_cache.clear()
-	_planet_material_cache.clear()
 
 # ----------------------------
 # ✅ PICK HELPERS (Raycast selection)
@@ -757,17 +755,35 @@ func _ensure_active_planets() -> void:
 			for p_idx in range(planets.size()):
 				var p_data: Dictionary = planets[p_idx]
 
-				var planet_node: MeshInstance3D = MeshInstance3D.new()
-				_tag_generated(planet_node)
-				var sm: SphereMesh = SphereMesh.new()
-				sm.radius = 0.4
-				sm.height = 0.8
-				planet_node.mesh = sm
+				# Instantiate procedural planet scene from addon
+				var scene_path: String = _get_planet_scene_path(p_data)
+				var scene_res: Variant = load(scene_path)
+				var planet_node: Node3D
+				if scene_res != null and scene_res is PackedScene:
+					planet_node = (scene_res as PackedScene).instantiate()
+					# Reset baked transform → identity, then uniform scale
+					planet_node.transform = Transform3D.IDENTITY
+					planet_node.scale = Vector3(0.8, 0.8, 0.8) # SphereMesh default r=0.5 → 0.4
+				else:
+					# Fallback: basic sphere
+					var fb: MeshInstance3D = MeshInstance3D.new()
+					var sm: SphereMesh = SphereMesh.new()
+					sm.radius = 0.4
+					sm.height = 0.8
+					fb.mesh = sm
+					planet_node = fb
 
+				_tag_generated(planet_node)
 				planet_node.set_meta("system_index", sys_idx2)
 				planet_node.set_meta("planet_index", p_idx)
+				planet_node.set_meta("pick_type", "planet")
 
-				planet_node.material_override = _get_planet_material_cached(sys_idx2, p_idx, p_data, false)
+				# Vary rotation speed per planet (subtle diversity)
+				var anim_tree: AnimationTree = planet_node.get_node_or_null("AnimationTree") as AnimationTree
+				if anim_tree:
+					var seed_val: int = int(abs(str(p_data["name"]).hash())) % 100
+					var speed: float = 0.04 + float(seed_val) * 0.001 # range 0.04–0.14
+					anim_tree.set("parameters/TimeScale/scale", speed)
 
 				add_child(planet_node)
 				(planet_meshes[sys_idx2] as Array).append(planet_node)
@@ -781,19 +797,16 @@ func _refresh_planet_highlights() -> void:
 	for sys_key in planet_meshes.keys():
 		var idx: int = int(sys_key)
 		var sys: Dictionary = systems[idx]
-		var planets: Array = sys["planets"]
 
 		var arr: Array = planet_meshes[idx]
 		for p_idx in range(arr.size()):
-			var planet_node: MeshInstance3D = arr[p_idx]
+			var planet_node: Node3D = arr[p_idx] as Node3D
 			if planet_node == null or !is_instance_valid(planet_node):
 				continue
 
 			var is_selected: bool = (idx == selected_system_index and p_idx == selected_planet_index)
-			var p_data: Dictionary = planets[p_idx]
 
-			planet_node.material_override = _get_planet_material_cached(idx, p_idx, p_data, is_selected)
-
+			# Selection ring
 			var key: String = "%d,%d" % [idx, p_idx]
 			if is_selected:
 				if !_planet_ring_nodes.has(key) or !is_instance_valid(_planet_ring_nodes[key]):
@@ -804,54 +817,45 @@ func _refresh_planet_highlights() -> void:
 					(_planet_ring_nodes[key] as Node).queue_free()
 				_planet_ring_nodes.erase(key)
 
-func _get_planet_material_cached(sys_idx: int, p_idx: int, p_data: Dictionary, is_selected: bool) -> StandardMaterial3D:
-	var key_mat: String = "%d,%d,%d" % [sys_idx, p_idx, (1 if is_selected else 0)]
-	if _planet_material_cache.has(key_mat):
-		return _planet_material_cache[key_mat] as StandardMaterial3D
+			# Selection glow: set emit on the atmosphere child shader
+			var atmo: MeshInstance3D = planet_node.get_node_or_null("Atmosphere") as MeshInstance3D
+			if atmo and atmo.mesh:
+				var mat: ShaderMaterial = atmo.mesh.material as ShaderMaterial
+				if mat == null and atmo.material_override is ShaderMaterial:
+					mat = atmo.material_override as ShaderMaterial
+				if mat:
+					if is_selected:
+						mat.set_shader_parameter("emit", true)
+						mat.set_shader_parameter("intensity", 8.0)
+						mat.set_shader_parameter("color_2", Color(0.3, 0.7, 1.0))
+					else:
+						mat.set_shader_parameter("emit", false)
+						mat.set_shader_parameter("intensity", 4.0)
 
-	var mat: StandardMaterial3D = StandardMaterial3D.new()
+# ----------------------------
+# Planet type → scene mapping
+# ----------------------------
 
-	var key_noise: String = "%d,%d" % [sys_idx, p_idx]
-	var noise_tex: NoiseTexture2D
+const PLANET_SCENE_BASE: String = "res://addons/naejimer_3d_planet_generator/scenes/"
 
-	if _planet_noise_cache.has(key_noise):
-		noise_tex = _planet_noise_cache[key_noise] as NoiseTexture2D
-	else:
-		var noise: FastNoiseLite = FastNoiseLite.new()
-		noise.seed = int(str(p_data["name"]).hash())
-		noise.frequency = 0.05
+func _get_planet_scene_path(p_data: Dictionary) -> String:
+	var res: Dictionary = p_data.get("resources", {})
+	var uranium: int = int(res.get("uranium", 0))
+	var titanium: int = int(res.get("titanium", 0))
+	var iron: int = int(res.get("iron", 0))
+	var data_val: int = int(res.get("data", 0))
 
-		noise_tex = NoiseTexture2D.new()
-		noise_tex.width = 512
-		noise_tex.height = 256
-		noise_tex.seamless = true
-		noise_tex.noise = noise
-
-		_planet_noise_cache[key_noise] = noise_tex
-
-	mat.albedo_texture = noise_tex
-
-	var res: Dictionary = p_data["resources"]
-
-	if int(res.get("uranium", 0)) > 0:
-		mat.albedo_color = Color(0.2, 0.8, 0.2)
-		mat.emission_enabled = true
-		mat.emission = Color(0.1, 0.3, 0.1)
-	elif int(res.get("titanium", 0)) > 0:
-		mat.albedo_color = Color(0.6, 0.6, 0.7)
-		mat.metallic = 0.8
-		mat.roughness = 0.2
-	else:
-		mat.albedo_color = Color(0.7, 0.4, 0.2)
-		mat.roughness = 0.9
-
-	if is_selected:
-		mat.emission_enabled = true
-		mat.emission = Color(0.0, 0.6, 1.0)
-		mat.emission_energy_multiplier = 1.5
-
-	_planet_material_cache[key_mat] = mat
-	return mat
+	if uranium > 5:
+		return PLANET_SCENE_BASE + "planet_lava.tscn"
+	if titanium > 5:
+		return PLANET_SCENE_BASE + "planet_ice.tscn"
+	if data_val > 0:
+		return PLANET_SCENE_BASE + "planet_gaseous.tscn"
+	if iron > 10:
+		return PLANET_SCENE_BASE + "planet_terrestrial.tscn"
+	if iron > 0:
+		return PLANET_SCENE_BASE + "planet_sand.tscn"
+	return PLANET_SCENE_BASE + "planet_no_atmosphere.tscn"
 
 func _add_selection_ring(parent_node: Node3D) -> Node3D:
 	var bracket_scene: Node3D = Node3D.new()
