@@ -9,7 +9,7 @@ class_name GalaxyMap3D
 var systems: Array = []
 var connections: Array = []
 
-var system_meshes: Array[MeshInstance3D] = []
+var system_meshes: Array[Node3D] = []
 var mothership_mesh: Node3D = null
 
 # key "s,p" -> Array[Node3D]
@@ -287,29 +287,64 @@ func generate_map_3d() -> void:
 
 		systems.append(system)
 
-		# Star mesh
-		var star_mesh: MeshInstance3D = MeshInstance3D.new()
-		_tag_generated(star_mesh)
-
-		var sm: SphereMesh = SphereMesh.new()
-		star_mesh.mesh = sm
-		star_mesh.position = pos
-
+		# Star mesh (shader-based from addon)
 		var star_visuals: Dictionary = _get_star_visuals(str(system["star_type"]))
-		var mat: StandardMaterial3D = base_mat.duplicate()
-		mat.emission = star_visuals["color"]
-		mat.emission_energy_multiplier = 1.0
-		star_mesh.material_override = mat
+		var star_scene: Variant = load(PLANET_SCENE_BASE + "star.tscn")
+		var star_mesh: Node3D
+		if star_scene != null and star_scene is PackedScene:
+			star_mesh = (star_scene as PackedScene).instantiate()
+			star_mesh.transform = Transform3D.IDENTITY
+			var s_size: float = float(star_visuals["size"])
+			star_mesh.scale = Vector3(s_size, s_size, s_size)
+			star_mesh.position = pos
 
-		sm.radius = float(star_visuals["size"])
-		sm.height = float(star_visuals["size"]) * 2.0
+			# Recolor body shader to match star type
+			var body_mi: MeshInstance3D = star_mesh as MeshInstance3D
+			if body_mi and body_mi.mesh:
+				var body_mat: ShaderMaterial = body_mi.mesh.material as ShaderMaterial
+				if body_mat:
+					var sc: Dictionary = _get_star_shader_colors(str(system["star_type"]))
+					body_mat = body_mat.duplicate() as ShaderMaterial
+					body_mat.set_shader_parameter("color_1", sc["c1"])
+					body_mat.set_shader_parameter("color_2", sc["c2"])
+					body_mat.set_shader_parameter("color_3", sc["c3"])
+					body_mat.set_shader_parameter("color_4", sc["c2"])
+					body_mat.set_shader_parameter("color_5", sc["c3"])
+					body_mi.mesh = body_mi.mesh.duplicate()
+					(body_mi.mesh as SphereMesh).material = body_mat
 
+			# Recolor atmosphere
+			var atmo: MeshInstance3D = star_mesh.get_node_or_null("Atmosphere") as MeshInstance3D
+			if atmo and atmo.mesh:
+				var atmo_mat: ShaderMaterial = atmo.mesh.material as ShaderMaterial
+				if atmo_mat:
+					var sc2: Dictionary = _get_star_shader_colors(str(system["star_type"]))
+					atmo_mat = atmo_mat.duplicate() as ShaderMaterial
+					atmo_mat.set_shader_parameter("color_1", sc2["c1"])
+					atmo_mat.set_shader_parameter("color_2", sc2["c3"])
+					atmo.mesh = atmo.mesh.duplicate()
+					(atmo.mesh as SphereMesh).material = atmo_mat
+		else:
+			# Fallback: basic sphere
+			var fb: MeshInstance3D = MeshInstance3D.new()
+			var sm: SphereMesh = SphereMesh.new()
+			sm.radius = float(star_visuals["size"])
+			sm.height = float(star_visuals["size"]) * 2.0
+			fb.mesh = sm
+			fb.position = pos
+			var mat: StandardMaterial3D = base_mat.duplicate()
+			mat.emission = star_visuals["color"]
+			mat.emission_energy_multiplier = 1.0
+			fb.material_override = mat
+			star_mesh = fb
+
+		_tag_generated(star_mesh)
 		star_mesh.set_meta("system_index", i)
 		add_child(star_mesh)
 		system_meshes.append(star_mesh)
 
 		# ✅ Pick sphere for stars (raycast)
-		_attach_pick_sphere(star_mesh, sm.radius * 1.15, "system", {"system_index": i})
+		_attach_pick_sphere(star_mesh, float(star_visuals["size"]) * 1.15, "system", {"system_index": i})
 
 	# connections first (so we have a good spread)
 	_generate_connections()
@@ -697,20 +732,33 @@ func _create_mothership_mesh() -> void:
 
 func update_selection_visuals() -> void:
 	for i in range(system_meshes.size()):
-		var star_node: MeshInstance3D = system_meshes[i]
+		var star_node: Node3D = system_meshes[i]
 		if star_node == null:
 			continue
 
-		var mat := star_node.material_override as StandardMaterial3D
-		if mat == null:
+		# Shader-based star: adjust atmosphere intensity
+		var atmo: MeshInstance3D = star_node.get_node_or_null("Atmosphere") as MeshInstance3D
+		if atmo and atmo.mesh:
+			var mat: ShaderMaterial = atmo.mesh.material as ShaderMaterial
+			if mat:
+				if i == selected_system_index:
+					mat.set_shader_parameter("intensity", 20.0)
+				elif bool(systems[i]["scanned"]):
+					mat.set_shader_parameter("intensity", 14.0)
+				else:
+					mat.set_shader_parameter("intensity", 8.0)
 			continue
 
-		if i == selected_system_index:
-			mat.emission_energy_multiplier = 4.0
-		elif bool(systems[i]["scanned"]):
-			mat.emission_energy_multiplier = 2.0
-		else:
-			mat.emission_energy_multiplier = 0.5
+		# Fallback: StandardMaterial3D star
+		if star_node is MeshInstance3D:
+			var mat2 := (star_node as MeshInstance3D).material_override as StandardMaterial3D
+			if mat2:
+				if i == selected_system_index:
+					mat2.emission_energy_multiplier = 4.0
+				elif bool(systems[i]["scanned"]):
+					mat2.emission_energy_multiplier = 2.0
+				else:
+					mat2.emission_energy_multiplier = 0.5
 
 	if mothership_node and mothership_mesh:
 		var current_idx: int = int(mothership_node.get_current_system())
@@ -838,24 +886,64 @@ func _refresh_planet_highlights() -> void:
 
 const PLANET_SCENE_BASE: String = "res://addons/naejimer_3d_planet_generator/scenes/"
 
+# Weighted planet type distribution — seeded by planet name for consistency
+const PLANET_TYPES: Array[String] = [
+	"planet_terrestrial.tscn",   # Earth-like
+	"planet_ice.tscn",           # Ice world
+	"planet_lava.tscn",          # Volcanic
+	"planet_sand.tscn",          # Desert
+	"planet_gaseous.tscn",       # Gas giant
+	"planet_no_atmosphere.tscn"  # Barren
+]
+
 func _get_planet_scene_path(p_data: Dictionary) -> String:
 	var res: Dictionary = p_data.get("resources", {})
 	var uranium: int = int(res.get("uranium", 0))
 	var titanium: int = int(res.get("titanium", 0))
 	var iron: int = int(res.get("iron", 0))
-	var data_val: int = int(res.get("data", 0))
 
+	# Build weighted pool based on resources
+	var weights: Array[float] = [
+		0.20,  # terrestrial (base)
+		0.15,  # ice
+		0.10,  # lava
+		0.15,  # sand
+		0.20,  # gaseous
+		0.20   # barren
+	]
+
+	# Resources shift probabilities
 	if uranium > 5:
-		return PLANET_SCENE_BASE + "planet_lava.tscn"
+		weights[2] += 0.40  # lava much more likely
+		weights[0] -= 0.10
+		weights[5] -= 0.10
 	if titanium > 5:
-		return PLANET_SCENE_BASE + "planet_ice.tscn"
-	if data_val > 0:
-		return PLANET_SCENE_BASE + "planet_gaseous.tscn"
-	if iron > 10:
-		return PLANET_SCENE_BASE + "planet_terrestrial.tscn"
-	if iron > 0:
-		return PLANET_SCENE_BASE + "planet_sand.tscn"
-	return PLANET_SCENE_BASE + "planet_no_atmosphere.tscn"
+		weights[1] += 0.35  # ice more likely
+		weights[3] -= 0.10
+		weights[5] -= 0.10
+	if iron > 200:
+		weights[0] += 0.25  # terrestrial more likely
+		weights[4] -= 0.10
+		weights[5] -= 0.10
+
+	# Clamp negatives
+	for w in range(weights.size()):
+		weights[w] = maxf(0.02, weights[w])
+
+	# Deterministic selection seeded by planet name
+	var seed_hash: int = int(abs(str(p_data.get("name", "planet")).hash()))
+	var total: float = 0.0
+	for wt in weights:
+		total += wt
+
+	var pick: float = fmod(float(seed_hash) / 100000.0, 1.0) * total
+	var accum: float = 0.0
+	for idx in range(PLANET_TYPES.size()):
+		accum += weights[idx]
+		if pick <= accum:
+			return PLANET_SCENE_BASE + PLANET_TYPES[idx]
+
+	return PLANET_SCENE_BASE + "planet_terrestrial.tscn"
 
 func _add_selection_ring(parent_node: Node3D) -> Node3D:
 	var bracket_scene: Node3D = Node3D.new()
@@ -1006,7 +1094,7 @@ func _process(_delta: float) -> void:
 
 		var arr: Array = planet_meshes[s_idx]
 		for p_idx in range(arr.size()):
-			var p_mesh: MeshInstance3D = arr[p_idx]
+			var p_mesh: Node3D = arr[p_idx] as Node3D
 			if p_mesh == null or !is_instance_valid(p_mesh):
 				continue
 
@@ -1024,7 +1112,7 @@ func _process(_delta: float) -> void:
 		var p_idx2: int = int(parts[1])
 
 		if planet_meshes.has(s_idx2) and p_idx2 >= 0 and p_idx2 < (planet_meshes[s_idx2] as Array).size():
-			var p_mesh2: MeshInstance3D = (planet_meshes[s_idx2] as Array)[p_idx2]
+			var p_mesh2: Node3D = (planet_meshes[s_idx2] as Array)[p_idx2] as Node3D
 			if p_mesh2 == null or !is_instance_valid(p_mesh2):
 				continue
 
@@ -1090,3 +1178,15 @@ func _get_star_visuals(t: String) -> Dictionary:
 		"K": return {"color": Color(1.0, 0.6, 0.2), "size": 0.8}
 		"M": return {"color": Color(1.0, 0.3, 0.1), "size": 0.6}
 	return {"color": Color(1, 1, 1), "size": 1.0}
+
+func _get_star_shader_colors(t: String) -> Dictionary:
+	# c1 = dark base, c2 = mid tone, c3 = bright highlight
+	match t:
+		"O": return {"c1": Color(0.05, 0.1, 0.4), "c2": Color(0.2, 0.5, 1.0), "c3": Color(0.6, 0.8, 1.0)}
+		"B": return {"c1": Color(0.1, 0.2, 0.5), "c2": Color(0.5, 0.7, 1.0), "c3": Color(0.8, 0.9, 1.0)}
+		"A": return {"c1": Color(0.5, 0.5, 0.5), "c2": Color(0.9, 0.9, 1.0), "c3": Color(1.0, 1.0, 1.0)}
+		"F": return {"c1": Color(0.5, 0.45, 0.2), "c2": Color(1.0, 0.95, 0.7), "c3": Color(1.0, 1.0, 0.9)}
+		"G": return {"c1": Color(0.5, 0.35, 0.0), "c2": Color(1.0, 0.85, 0.2), "c3": Color(1.0, 0.95, 0.5)}
+		"K": return {"c1": Color(0.45, 0.15, 0.0), "c2": Color(1.0, 0.5, 0.1), "c3": Color(1.0, 0.7, 0.3)}
+		"M": return {"c1": Color(0.4, 0.08, 0.0), "c2": Color(1.0, 0.3, 0.05), "c3": Color(1.0, 0.5, 0.15)}
+	return {"c1": Color(0.5, 0.35, 0.0), "c2": Color(1.0, 0.85, 0.2), "c3": Color(1.0, 0.95, 0.5)}
