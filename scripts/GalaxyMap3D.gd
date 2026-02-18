@@ -310,7 +310,7 @@ func generate_map_3d() -> void:
 					body_mat.set_shader_parameter("color_3", sc["c3"])
 					body_mat.set_shader_parameter("color_4", sc["c2"])
 					body_mat.set_shader_parameter("color_5", sc["c3"])
-					body_mat.set_shader_parameter("emit", 1.2) # lower → shows surface detail
+					body_mat.set_shader_parameter("emit", sc.get("emit", 1.0))
 					body_mi.mesh = body_mi.mesh.duplicate()
 					(body_mi.mesh as SphereMesh).material = body_mat
 
@@ -1139,13 +1139,16 @@ func _get_star_visuals(t: String) -> Dictionary:
 	return {"color": Color(1, 1, 1), "size": 1.0}
 
 func _get_star_shader_colors(t: String) -> Dictionary:
-	# c1 = dark base, c2 = mid tone, c3 = bright highlight
+	# c1 = dark base (MUCH darker for visible noise bands)
+	# c2 = mid tone, c3 = bright highlight
+	# emit = per-type emission (lower for bright stars to keep detail)
 	match t:
-		"O": return {"c1": Color(0.05, 0.1, 0.4), "c2": Color(0.2, 0.5, 1.0), "c3": Color(0.6, 0.8, 1.0)}
-		"B": return {"c1": Color(0.1, 0.2, 0.5), "c2": Color(0.5, 0.7, 1.0), "c3": Color(0.8, 0.9, 1.0)}
-		"A": return {"c1": Color(0.5, 0.5, 0.5), "c2": Color(0.9, 0.9, 1.0), "c3": Color(1.0, 1.0, 1.0)}
-		"F": return {"c1": Color(0.5, 0.45, 0.2), "c2": Color(1.0, 0.95, 0.7), "c3": Color(1.0, 1.0, 0.9)}
-		"G": return {"c1": Color(0.5, 0.35, 0.0), "c2": Color(1.0, 0.85, 0.2), "c3": Color(1.0, 0.95, 0.5)}
-		"K": return {"c1": Color(0.45, 0.15, 0.0), "c2": Color(1.0, 0.5, 0.1), "c3": Color(1.0, 0.7, 0.3)}
-		"M": return {"c1": Color(0.4, 0.08, 0.0), "c2": Color(1.0, 0.3, 0.05), "c3": Color(1.0, 0.5, 0.15)}
-	return {"c1": Color(0.5, 0.35, 0.0), "c2": Color(1.0, 0.85, 0.2), "c3": Color(1.0, 0.95, 0.5)}
+		"O": return {"c1": Color(0.02, 0.04, 0.18), "c2": Color(0.15, 0.4, 0.9),  "c3": Color(0.5, 0.7, 1.0),  "emit": 0.8}
+		"B": return {"c1": Color(0.04, 0.08, 0.25), "c2": Color(0.35, 0.55, 0.9), "c3": Color(0.7, 0.85, 1.0), "emit": 0.7}
+		"A": return {"c1": Color(0.15, 0.15, 0.2),  "c2": Color(0.6, 0.6, 0.75),  "c3": Color(0.9, 0.9, 1.0),  "emit": 0.5}
+		"F": return {"c1": Color(0.2, 0.18, 0.05),  "c2": Color(0.7, 0.65, 0.3),  "c3": Color(1.0, 0.95, 0.6), "emit": 0.6}
+		"G": return {"c1": Color(0.25, 0.15, 0.0),  "c2": Color(0.8, 0.6, 0.1),   "c3": Color(1.0, 0.85, 0.3), "emit": 0.8}
+		"K": return {"c1": Color(0.2, 0.06, 0.0),   "c2": Color(0.8, 0.35, 0.05), "c3": Color(1.0, 0.6, 0.2),  "emit": 1.0}
+		"M": return {"c1": Color(0.18, 0.03, 0.0),  "c2": Color(0.7, 0.2, 0.02),  "c3": Color(1.0, 0.4, 0.1),  "emit": 1.5}
+	return {"c1": Color(0.25, 0.15, 0.0), "c2": Color(0.8, 0.6, 0.1), "c3": Color(1.0, 0.85, 0.3), "emit": 0.8}
+
