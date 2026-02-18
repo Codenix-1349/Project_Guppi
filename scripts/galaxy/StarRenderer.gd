@@ -56,7 +56,7 @@ func create_star(system_data: Dictionary, pos: Vector3, sys_idx: int) -> Node3D:
 	# Add pick sphere
 	# Note: Calling back to map helper or duplicating helper logic?
 	# Better to duplicate simple helper logic here or expose it
-	_attach_pick_sphere(star_mesh, float(star_visuals["size"]) * 1.15, "system", {"system_index": sys_idx})
+	_attach_pick_sphere(star_mesh, 0.5, "system", {"system_index": sys_idx})
 	
 	return star_mesh
 

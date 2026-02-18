@@ -236,7 +236,7 @@ func _create_system_planets(sys: Dictionary, sys_idx: int) -> void:
 		(_planet_meshes[sys_idx] as Array).append(planet_node)
 
 		# Flattened pick sphere attach
-		_attach_pick_sphere(planet_node, 0.4 * 1.25, "planet", {"system_index": sys_idx, "planet_index": p_idx})
+		_attach_pick_sphere(planet_node, 0.5, "planet", {"system_index": sys_idx, "planet_index": p_idx})
 
 		_draw_orbit_path(sys_idx, float(p_data["orbit_radius"]), sys["position"])
 
