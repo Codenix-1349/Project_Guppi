@@ -9,7 +9,7 @@ class_name GalaxyMap3D
 var systems: Array = []
 var connections: Array = []
 
-var system_meshes: Array[MeshInstance3D] = []
+var system_meshes: Array[Node3D] = []
 var mothership_mesh: Node3D = null
 
 # key "s,p" -> Array[Node3D]
@@ -122,8 +122,6 @@ func _clear_generated_nodes() -> void:
 	unit_indicators.clear()
 
 	_planet_ring_nodes.clear()
-	_planet_noise_cache.clear()
-	_planet_material_cache.clear()
 
 # ----------------------------
 # ✅ PICK HELPERS (Raycast selection)
@@ -289,29 +287,66 @@ func generate_map_3d() -> void:
 
 		systems.append(system)
 
-		# Star mesh
-		var star_mesh: MeshInstance3D = MeshInstance3D.new()
-		_tag_generated(star_mesh)
-
-		var sm: SphereMesh = SphereMesh.new()
-		star_mesh.mesh = sm
-		star_mesh.position = pos
-
+		# Star mesh (shader-based from addon)
 		var star_visuals: Dictionary = _get_star_visuals(str(system["star_type"]))
-		var mat: StandardMaterial3D = base_mat.duplicate()
-		mat.emission = star_visuals["color"]
-		mat.emission_energy_multiplier = 1.0
-		star_mesh.material_override = mat
+		var star_scene: Variant = load(PLANET_SCENE_BASE + "star.tscn")
+		var star_mesh: Node3D
+		if star_scene != null and star_scene is PackedScene:
+			star_mesh = (star_scene as PackedScene).instantiate()
+			star_mesh.transform = Transform3D.IDENTITY
+			var s_size: float = float(star_visuals["size"])
+			star_mesh.scale = Vector3(s_size, s_size, s_size)
+			star_mesh.position = pos
 
-		sm.radius = float(star_visuals["size"])
-		sm.height = float(star_visuals["size"]) * 2.0
+			# Recolor body shader to match star type
+			var body_mi: MeshInstance3D = star_mesh as MeshInstance3D
+			if body_mi and body_mi.mesh:
+				var body_mat: ShaderMaterial = body_mi.mesh.material as ShaderMaterial
+				if body_mat:
+					var sc: Dictionary = _get_star_shader_colors(str(system["star_type"]))
+					body_mat = body_mat.duplicate() as ShaderMaterial
+					body_mat.set_shader_parameter("color_1", sc["c1"])
+					body_mat.set_shader_parameter("color_2", sc["c2"])
+					body_mat.set_shader_parameter("color_3", sc["c3"])
+					body_mat.set_shader_parameter("color_4", sc["c2"])
+					body_mat.set_shader_parameter("color_5", sc["c3"])
+					body_mat.set_shader_parameter("emit", sc.get("emit", 1.0))
+					body_mi.mesh = body_mi.mesh.duplicate()
+					(body_mi.mesh as SphereMesh).material = body_mat
 
+			# Recolor atmosphere (softer glow)
+			var atmo: MeshInstance3D = star_mesh.get_node_or_null("Atmosphere") as MeshInstance3D
+			if atmo and atmo.mesh:
+				var atmo_mat: ShaderMaterial = atmo.mesh.material as ShaderMaterial
+				if atmo_mat:
+					var sc2: Dictionary = _get_star_shader_colors(str(system["star_type"]))
+					atmo_mat = atmo_mat.duplicate() as ShaderMaterial
+					atmo_mat.set_shader_parameter("color_1", sc2["c1"])
+					atmo_mat.set_shader_parameter("color_2", sc2["c3"])
+					atmo_mat.set_shader_parameter("intensity", 5.0) # lower → less blowout
+					atmo.mesh = atmo.mesh.duplicate()
+					(atmo.mesh as SphereMesh).material = atmo_mat
+		else:
+			# Fallback: basic sphere
+			var fb: MeshInstance3D = MeshInstance3D.new()
+			var sm: SphereMesh = SphereMesh.new()
+			sm.radius = float(star_visuals["size"])
+			sm.height = float(star_visuals["size"]) * 2.0
+			fb.mesh = sm
+			fb.position = pos
+			var mat: StandardMaterial3D = base_mat.duplicate()
+			mat.emission = star_visuals["color"]
+			mat.emission_energy_multiplier = 1.0
+			fb.material_override = mat
+			star_mesh = fb
+
+		_tag_generated(star_mesh)
 		star_mesh.set_meta("system_index", i)
 		add_child(star_mesh)
 		system_meshes.append(star_mesh)
 
 		# ✅ Pick sphere for stars (raycast)
-		_attach_pick_sphere(star_mesh, sm.radius * 1.15, "system", {"system_index": i})
+		_attach_pick_sphere(star_mesh, float(star_visuals["size"]) * 1.15, "system", {"system_index": i})
 
 	# connections first (so we have a good spread)
 	_generate_connections()
@@ -699,20 +734,33 @@ func _create_mothership_mesh() -> void:
 
 func update_selection_visuals() -> void:
 	for i in range(system_meshes.size()):
-		var star_node: MeshInstance3D = system_meshes[i]
+		var star_node: Node3D = system_meshes[i]
 		if star_node == null:
 			continue
 
-		var mat := star_node.material_override as StandardMaterial3D
-		if mat == null:
+		# Shader-based star: adjust atmosphere intensity
+		var atmo: MeshInstance3D = star_node.get_node_or_null("Atmosphere") as MeshInstance3D
+		if atmo and atmo.mesh:
+			var mat: ShaderMaterial = atmo.mesh.material as ShaderMaterial
+			if mat:
+				if i == selected_system_index:
+					mat.set_shader_parameter("intensity", 20.0)
+				elif bool(systems[i]["scanned"]):
+					mat.set_shader_parameter("intensity", 14.0)
+				else:
+					mat.set_shader_parameter("intensity", 8.0)
 			continue
 
-		if i == selected_system_index:
-			mat.emission_energy_multiplier = 4.0
-		elif bool(systems[i]["scanned"]):
-			mat.emission_energy_multiplier = 2.0
-		else:
-			mat.emission_energy_multiplier = 0.5
+		# Fallback: StandardMaterial3D star
+		if star_node is MeshInstance3D:
+			var mat2 := (star_node as MeshInstance3D).material_override as StandardMaterial3D
+			if mat2:
+				if i == selected_system_index:
+					mat2.emission_energy_multiplier = 4.0
+				elif bool(systems[i]["scanned"]):
+					mat2.emission_energy_multiplier = 2.0
+				else:
+					mat2.emission_energy_multiplier = 0.5
 
 	if mothership_node and mothership_mesh:
 		var current_idx: int = int(mothership_node.get_current_system())
@@ -757,17 +805,35 @@ func _ensure_active_planets() -> void:
 			for p_idx in range(planets.size()):
 				var p_data: Dictionary = planets[p_idx]
 
-				var planet_node: MeshInstance3D = MeshInstance3D.new()
-				_tag_generated(planet_node)
-				var sm: SphereMesh = SphereMesh.new()
-				sm.radius = 0.4
-				sm.height = 0.8
-				planet_node.mesh = sm
+				# Instantiate procedural planet scene from addon
+				var scene_path: String = _get_planet_scene_path(p_data)
+				var scene_res: Variant = load(scene_path)
+				var planet_node: Node3D
+				if scene_res != null and scene_res is PackedScene:
+					planet_node = (scene_res as PackedScene).instantiate()
+					# Reset baked transform → identity, then uniform scale
+					planet_node.transform = Transform3D.IDENTITY
+					planet_node.scale = Vector3(0.8, 0.8, 0.8) # SphereMesh default r=0.5 → 0.4
+				else:
+					# Fallback: basic sphere
+					var fb: MeshInstance3D = MeshInstance3D.new()
+					var sm: SphereMesh = SphereMesh.new()
+					sm.radius = 0.4
+					sm.height = 0.8
+					fb.mesh = sm
+					planet_node = fb
 
+				_tag_generated(planet_node)
 				planet_node.set_meta("system_index", sys_idx2)
 				planet_node.set_meta("planet_index", p_idx)
+				planet_node.set_meta("pick_type", "planet")
 
-				planet_node.material_override = _get_planet_material_cached(sys_idx2, p_idx, p_data, false)
+				# Vary rotation speed per planet (subtle diversity)
+				var anim_tree: AnimationTree = planet_node.get_node_or_null("AnimationTree") as AnimationTree
+				if anim_tree:
+					var seed_val: int = int(abs(str(p_data["name"]).hash())) % 100
+					var speed: float = 0.04 + float(seed_val) * 0.001 # range 0.04–0.14
+					anim_tree.set("parameters/TimeScale/scale", speed)
 
 				add_child(planet_node)
 				(planet_meshes[sys_idx2] as Array).append(planet_node)
@@ -781,19 +847,16 @@ func _refresh_planet_highlights() -> void:
 	for sys_key in planet_meshes.keys():
 		var idx: int = int(sys_key)
 		var sys: Dictionary = systems[idx]
-		var planets: Array = sys["planets"]
 
 		var arr: Array = planet_meshes[idx]
 		for p_idx in range(arr.size()):
-			var planet_node: MeshInstance3D = arr[p_idx]
+			var planet_node: Node3D = arr[p_idx] as Node3D
 			if planet_node == null or !is_instance_valid(planet_node):
 				continue
 
 			var is_selected: bool = (idx == selected_system_index and p_idx == selected_planet_index)
-			var p_data: Dictionary = planets[p_idx]
 
-			planet_node.material_override = _get_planet_material_cached(idx, p_idx, p_data, is_selected)
-
+			# Selection ring
 			var key: String = "%d,%d" % [idx, p_idx]
 			if is_selected:
 				if !_planet_ring_nodes.has(key) or !is_instance_valid(_planet_ring_nodes[key]):
@@ -804,54 +867,42 @@ func _refresh_planet_highlights() -> void:
 					(_planet_ring_nodes[key] as Node).queue_free()
 				_planet_ring_nodes.erase(key)
 
-func _get_planet_material_cached(sys_idx: int, p_idx: int, p_data: Dictionary, is_selected: bool) -> StandardMaterial3D:
-	var key_mat: String = "%d,%d,%d" % [sys_idx, p_idx, (1 if is_selected else 0)]
-	if _planet_material_cache.has(key_mat):
-		return _planet_material_cache[key_mat] as StandardMaterial3D
+			# Selection glow: set emit on the atmosphere child shader
+			var atmo: MeshInstance3D = planet_node.get_node_or_null("Atmosphere") as MeshInstance3D
+			if atmo and atmo.mesh:
+				var mat: ShaderMaterial = atmo.mesh.material as ShaderMaterial
+				if mat == null and atmo.material_override is ShaderMaterial:
+					mat = atmo.material_override as ShaderMaterial
+				if mat:
+					if is_selected:
+						mat.set_shader_parameter("emit", true)
+						mat.set_shader_parameter("intensity", 8.0)
+						mat.set_shader_parameter("color_2", Color(0.3, 0.7, 1.0))
+					else:
+						mat.set_shader_parameter("emit", false)
+						mat.set_shader_parameter("intensity", 4.0)
 
-	var mat: StandardMaterial3D = StandardMaterial3D.new()
+# ----------------------------
+# Planet type → scene mapping
+# ----------------------------
 
-	var key_noise: String = "%d,%d" % [sys_idx, p_idx]
-	var noise_tex: NoiseTexture2D
+const PLANET_SCENE_BASE: String = "res://addons/naejimer_3d_planet_generator/scenes/"
 
-	if _planet_noise_cache.has(key_noise):
-		noise_tex = _planet_noise_cache[key_noise] as NoiseTexture2D
-	else:
-		var noise: FastNoiseLite = FastNoiseLite.new()
-		noise.seed = int(str(p_data["name"]).hash())
-		noise.frequency = 0.05
+# Weighted planet type distribution — seeded by planet name for consistency
+const PLANET_TYPES: Array[String] = [
+	"planet_terrestrial.tscn",   # Earth-like
+	"planet_ice.tscn",           # Ice world
+	"planet_lava.tscn",          # Volcanic
+	"planet_sand.tscn",          # Desert
+	"planet_gaseous.tscn",       # Gas giant
+	"planet_no_atmosphere.tscn"  # Barren
+]
 
-		noise_tex = NoiseTexture2D.new()
-		noise_tex.width = 512
-		noise_tex.height = 256
-		noise_tex.seamless = true
-		noise_tex.noise = noise
-
-		_planet_noise_cache[key_noise] = noise_tex
-
-	mat.albedo_texture = noise_tex
-
-	var res: Dictionary = p_data["resources"]
-
-	if int(res.get("uranium", 0)) > 0:
-		mat.albedo_color = Color(0.2, 0.8, 0.2)
-		mat.emission_enabled = true
-		mat.emission = Color(0.1, 0.3, 0.1)
-	elif int(res.get("titanium", 0)) > 0:
-		mat.albedo_color = Color(0.6, 0.6, 0.7)
-		mat.metallic = 0.8
-		mat.roughness = 0.2
-	else:
-		mat.albedo_color = Color(0.7, 0.4, 0.2)
-		mat.roughness = 0.9
-
-	if is_selected:
-		mat.emission_enabled = true
-		mat.emission = Color(0.0, 0.6, 1.0)
-		mat.emission_energy_multiplier = 1.5
-
-	_planet_material_cache[key_mat] = mat
-	return mat
+func _get_planet_scene_path(p_data: Dictionary) -> String:
+	# Equal distribution — purely visual, decoupled from resources
+	var seed_hash: int = int(abs(str(p_data.get("name", "planet")).hash()))
+	var type_idx: int = seed_hash % PLANET_TYPES.size()
+	return PLANET_SCENE_BASE + PLANET_TYPES[type_idx]
 
 func _add_selection_ring(parent_node: Node3D) -> Node3D:
 	var bracket_scene: Node3D = Node3D.new()
@@ -1002,7 +1053,7 @@ func _process(_delta: float) -> void:
 
 		var arr: Array = planet_meshes[s_idx]
 		for p_idx in range(arr.size()):
-			var p_mesh: MeshInstance3D = arr[p_idx]
+			var p_mesh: Node3D = arr[p_idx] as Node3D
 			if p_mesh == null or !is_instance_valid(p_mesh):
 				continue
 
@@ -1020,7 +1071,7 @@ func _process(_delta: float) -> void:
 		var p_idx2: int = int(parts[1])
 
 		if planet_meshes.has(s_idx2) and p_idx2 >= 0 and p_idx2 < (planet_meshes[s_idx2] as Array).size():
-			var p_mesh2: MeshInstance3D = (planet_meshes[s_idx2] as Array)[p_idx2]
+			var p_mesh2: Node3D = (planet_meshes[s_idx2] as Array)[p_idx2] as Node3D
 			if p_mesh2 == null or !is_instance_valid(p_mesh2):
 				continue
 
@@ -1086,3 +1137,18 @@ func _get_star_visuals(t: String) -> Dictionary:
 		"K": return {"color": Color(1.0, 0.6, 0.2), "size": 0.8}
 		"M": return {"color": Color(1.0, 0.3, 0.1), "size": 0.6}
 	return {"color": Color(1, 1, 1), "size": 1.0}
+
+func _get_star_shader_colors(t: String) -> Dictionary:
+	# c1 = dark base (MUCH darker for visible noise bands)
+	# c2 = mid tone, c3 = bright highlight
+	# emit = per-type emission (lower for bright stars to keep detail)
+	match t:
+		"O": return {"c1": Color(0.02, 0.04, 0.18), "c2": Color(0.15, 0.4, 0.9),  "c3": Color(0.5, 0.7, 1.0),  "emit": 0.8}
+		"B": return {"c1": Color(0.04, 0.08, 0.25), "c2": Color(0.35, 0.55, 0.9), "c3": Color(0.7, 0.85, 1.0), "emit": 0.7}
+		"A": return {"c1": Color(0.15, 0.15, 0.2),  "c2": Color(0.6, 0.6, 0.75),  "c3": Color(0.9, 0.9, 1.0),  "emit": 0.5}
+		"F": return {"c1": Color(0.2, 0.18, 0.05),  "c2": Color(0.7, 0.65, 0.3),  "c3": Color(1.0, 0.95, 0.6), "emit": 0.6}
+		"G": return {"c1": Color(0.25, 0.15, 0.0),  "c2": Color(0.8, 0.6, 0.1),   "c3": Color(1.0, 0.85, 0.3), "emit": 0.8}
+		"K": return {"c1": Color(0.2, 0.06, 0.0),   "c2": Color(0.8, 0.35, 0.05), "c3": Color(1.0, 0.6, 0.2),  "emit": 1.0}
+		"M": return {"c1": Color(0.18, 0.03, 0.0),  "c2": Color(0.7, 0.2, 0.02),  "c3": Color(1.0, 0.4, 0.1),  "emit": 1.5}
+	return {"c1": Color(0.25, 0.15, 0.0), "c2": Color(0.8, 0.6, 0.1), "c3": Color(1.0, 0.85, 0.3), "emit": 0.8}
+
