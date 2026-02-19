@@ -34,6 +34,8 @@ extends Node3D
 @onready var scan_button: Button = $UI/Control/ActionButtons/ScanButton
 @onready var launch_scout_btn: Button = $UI/Control/ActionButtons/LaunchScoutButton
 @onready var deploy_miner_btn: Button = $UI/Control/ActionButtons/AssignMinerButton
+var land_button: Button = null
+
 @onready var combat_log: Label = $UI/Control/CombatLog
 @onready var info_label: Label = $UI/Control/InfoPanel/Label
 @onready var system_panel: PanelContainer = $UI/Control/SystemPanel
@@ -138,6 +140,17 @@ func _create_modules() -> void:
 	if has_node("UI/Control"):
 		_combat_ui.init(combat_manager, _icon_renderer, $UI/Control)
 	_combat_ui.combat_mode_changed.connect(_on_combat_mode_changed)
+	
+	# Create Land Button
+	land_button = Button.new()
+	land_button.text = "LAND ON SURFACE"
+	land_button.name = "LandButton"
+	land_button.visible = false
+	if _ui_action_buttons:
+		_ui_action_buttons.add_child(land_button)
+		# Move it to start or end? End is fine.
+		land_button.pressed.connect(_on_land_button_pressed)
+
 
 	# SelectionHandler
 	_selection_handler = SelectionHandler.new()
@@ -239,6 +252,56 @@ func _focus_camera_on_start() -> void:
 				pivot.focus_on(sys.position)
 
 # ---------------------------
+# View Management (Galaxy <-> Planet Surface)
+# ---------------------------
+
+var _planet_view_instance: Node = null
+const PLANET_SURFACE_SCENE = preload("res://scenes/planet/PlanetSurface.tscn")
+
+func enter_planet_view(planet_data: Dictionary) -> void:
+	if _planet_view_instance:
+		return
+
+	# Hide Galaxy View
+	galaxy_map.visible = false
+	# mothership is a logic node, visuals are in galaxy_map
+	
+	# Hide Galaxy UI panels (SystemPanel, etc.)
+	_set_galaxy_ui_visible(false)
+
+	# Instantiate Planet Surface
+	_planet_view_instance = PLANET_SURFACE_SCENE.instantiate()
+	add_child(_planet_view_instance)
+	
+	if _planet_view_instance.has_signal("request_exit"):
+		_planet_view_instance.request_exit.connect(exit_planet_view)
+	
+	if _planet_view_instance.has_method("setup"):
+		_planet_view_instance.setup(planet_data)
+
+	# TODO: Show Planet HUD
+
+func exit_planet_view() -> void:
+	if _planet_view_instance:
+		_planet_view_instance.queue_free()
+		_planet_view_instance = null
+
+	# Show Galaxy View
+	galaxy_map.visible = true
+	
+	_set_galaxy_ui_visible(true)
+	
+	# Reset camera?
+	call_deferred("_focus_camera_on_start") # or keep last pos
+
+func _set_galaxy_ui_visible(vis: bool) -> void:
+	$UI/Control.visible = vis
+	# If we have specific panels for planet view, toggle them here
+	# For now, hiding the main control hides everything (resource bar, buttons)
+	# We might want to keep resource bar visible? User requirement: "RTS style ... build menu"
+	# Probably needs its own UI layer. For Phase 1, basic toggle is fine.
+
+# ---------------------------
 # External assets check
 # ---------------------------
 
@@ -264,6 +327,21 @@ func _unhandled_input(event: InputEvent) -> void:
 
 func _on_selection_changed() -> void:
 	_ui_manager.update_ui()
+	_update_land_button_visibility()
+
+func _update_land_button_visibility() -> void:
+	if not land_button: return
+	
+	# Only show if a planet is selected and we are in galaxy view
+	var p_idx: int = galaxy_map.selected_planet_index if "selected_planet_index" in galaxy_map else -1
+	var s_idx: int = galaxy_map.selected_system_index if "selected_system_index" in galaxy_map else -1 # Also need system?
+	
+	# Check if planet selected
+	if p_idx != -1 and galaxy_map.visible: # Only show in galaxy view
+		land_button.visible = true
+	else:
+		land_button.visible = false
+
 
 func _on_phase_changed(new_phase: int) -> void:
 	_ui_manager.on_phase_changed(new_phase)
@@ -339,6 +417,23 @@ func _on_deploy_miner_pressed() -> void:
 	if result.success:
 		galaxy_map.update_selection_visuals()
 		_ui_manager.update_ui()
+		
+func _on_land_button_pressed() -> void:
+	var s_idx: int = galaxy_map.selected_system_index
+	var p_idx: int = galaxy_map.selected_planet_index
+	
+	if s_idx == -1 or p_idx == -1: 
+		return
+
+	# We need the planet data dictionary.
+	# GalaxyMap3D stores systems -> planets array
+	if galaxy_map and "systems" in galaxy_map:
+		var system: Dictionary = galaxy_map.systems[s_idx]
+		var planets: Array = system.get("planets", [])
+		if p_idx >= 0 and p_idx < planets.size():
+			var p_data: Dictionary = planets[p_idx]
+			enter_planet_view(p_data)
+
 
 func _on_print_requested(drone_id: String) -> void:
 	var drone: Variant = Global.get_drone_by_id(drone_id)

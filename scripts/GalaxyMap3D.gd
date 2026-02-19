@@ -153,6 +153,7 @@ func generate_map_3d() -> void:
 					"titanium": _rng_layout.randi_range(0, 100) if _rng_layout.randf() > 0.5 else 0,
 					"uranium": _rng_layout.randi_range(0, 50) if _rng_layout.randf() > 0.8 else 0
 				},
+				"visual_type": _get_planet_visual_type_from_seed("Planet " + str(i) + "-" + str(p)),
 				"orbit_radius": _rng_layout.randf_range(4.0, 12.0),
 				"orbit_speed": _rng_layout.randf_range(0.2, 1.0),
 				"phase": _rng_layout.randf() * TAU
@@ -354,6 +355,20 @@ func _get_random_star_type(rng: RandomNumberGenerator) -> String:
 	if roll < 0.50: return "G"
 	if roll < 0.75: return "K"
 	return "M"
+
+func _get_planet_visual_type_from_seed(p_name: String) -> String:
+	# Deterministic type based on name hash
+	# Types match PlanetRenderer/PlanetSurface expected strings
+	const TYPES: Array[String] = [
+		"terrestrial",
+		"ice",
+		"lava",
+		"sand",
+		"gaseous",
+		"barren"
+	]
+	var h: int = int(abs(p_name.hash()))
+	return TYPES[h % TYPES.size()]
 
 # ----------------------------
 # Misc Helpers
