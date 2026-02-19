@@ -1,0 +1,39 @@
+[gd_scene load_steps=5 format=3 uid="uid://c8k7j3l4m5n6"]
+
+[ext_resource type="Script" path="res://scripts/planet/PlanetSurface.gd" id="1_surface"]
+[ext_resource type="Script" path="res://scripts/planet/RTSCamera.gd" id="2_camera"]
+[ext_resource type="Script" path="res://scripts/planet/TerrainGrid.gd" id="3_grid"]
+
+[sub_resource type="Environment" id="Environment_sky"]
+background_mode = 1
+background_color = Color(0.02, 0.02, 0.02, 1)
+ambient_light_source = 2
+ambient_light_color = Color(0.1, 0.1, 0.1, 1)
+tonemap_mode = 2
+glow_enabled = false
+
+[node name="PlanetSurface" type="Node3D"]
+script = ExtResource("1_surface")
+
+[node name="NavigationRegion3D" type="NavigationRegion3D" parent="."]
+
+[node name="TerrainGrid" type="Node3D" parent="NavigationRegion3D"]
+script = ExtResource("3_grid")
+tile_scale = 2.0
+map_width = 60
+map_height = 60
+
+[node name="Sun" type="DirectionalLight3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 0.258819, 0.965926, 0, -0.965926, 0.258819, 0, 10, 0)
+light_energy = 0.5
+shadow_enabled = true
+
+[node name="WorldEnvironment" type="WorldEnvironment" parent="."]
+environment = SubResource("Environment_sky")
+
+[node name="CameraRig" type="Node3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 0.707107, 0.707107, 0, -0.707107, 0.707107, 0, 0, 0)
+script = ExtResource("2_camera")
+
+[node name="Camera3D" type="Camera3D" parent="CameraRig"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 30)

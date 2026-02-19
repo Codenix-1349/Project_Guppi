@@ -263,10 +263,20 @@ func _clear_planet_visuals(sys_idx: int) -> void:
 			_planet_ring_nodes.erase(k)
 
 func _get_planet_scene_path(p_data: Dictionary) -> String:
-	# Equal distribution — purely visual, decoupled from resources
-	var seed_hash: int = int(abs(str(p_data.get("name", "planet")).hash()))
-	var type_idx: int = seed_hash % PLANET_TYPES.size()
-	return PLANET_SCENE_BASE + PLANET_TYPES[type_idx]
+	# Use stored visual type from GalaxyMap3D generation
+	var v_type: String = p_data.get("visual_type", "terrestrial")
+	var scene_file: String = "planet_terrestrial.tscn"
+	
+	match v_type:
+		"terrestrial": scene_file = "planet_terrestrial.tscn"
+		"ice": scene_file = "planet_ice.tscn"
+		"lava": scene_file = "planet_lava.tscn"
+		"sand": scene_file = "planet_sand.tscn"
+		"gaseous": scene_file = "planet_gaseous.tscn"
+		"barren": scene_file = "planet_no_atmosphere.tscn"
+		_: scene_file = "planet_terrestrial.tscn"
+
+	return PLANET_SCENE_BASE + scene_file
 
 func _draw_orbit_path(sys_idx: int, radius: float, center_pos: Vector3) -> void:
 	if !_orbit_meshes.has(sys_idx):
