@@ -1,4 +1,4 @@
-# 🚀 Project Guppi – Deep Space Strategy  
+# 🚀 Project Guppi – Deep Space Strategy  -=under construction=-
 > Turn-based 3D space strategy prototype built with Godot 4 (GDScript · procedural systems · modular game architecture)
 
 <p align="left">
